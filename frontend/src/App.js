@@ -14,9 +14,11 @@ import Historico from "./pages/Historico";
 import Dashboard from "./pages/Dashboard";
 import Materiais from "./pages/Materiais";
 import GeradorQR from "./pages/GeradorQR";
+import GeradorConteudo from "./pages/GeradorConteudo";
 import OQueAprende from "./pages/OQueAprende";
 import ComoFunciona from "./pages/ComoFunciona";
 import Configuracoes from "./pages/Configuracoes";
+import Atividade from "./pages/Atividade";
 
 import "./App.css";
 
@@ -47,7 +49,9 @@ function App() {
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/materiais" element={<Materiais />} />
             <Route path="/gerador-qr" element={<GeradorQR />} />
+            <Route path="/gerador-conteudo" element={<GeradorConteudo />} />
             <Route path="/configuracoes" element={<Configuracoes />} />
+            <Route path="/atividade" element={<Atividade />} />
           </Routes>
           <Toaster
             position="top-right"

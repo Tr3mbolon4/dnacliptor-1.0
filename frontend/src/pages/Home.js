@@ -18,6 +18,7 @@ import {
   Box,
   BookOpen,
   Zap,
+  FileText,
 } from "lucide-react";
 
 export default function Home() {
@@ -68,6 +69,14 @@ export default function Home() {
       path: "/gerador-qr",
       color: "bg-accent",
       testId: "action-gerador",
+    },
+    {
+      title: "QR Code por Conteúdo",
+      description: "Textos, mensagens, links e imagens",
+      icon: FileText,
+      path: "/gerador-conteudo",
+      color: "bg-primary/80",
+      testId: "action-gerador-conteudo",
     },
   ];
 
@@ -181,7 +190,7 @@ export default function Home() {
         {/* Main Actions */}
         <section>
           <h2 className="font-heading text-2xl font-bold mb-6">Funcionalidades Principais</h2>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
             {mainActions.map((action) => (
               <Link key={action.path} to={action.path}>
                 <Card className="card-hover h-full cursor-pointer" data-testid={action.testId}>

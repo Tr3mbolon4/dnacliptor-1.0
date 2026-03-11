@@ -1,5 +1,5 @@
-from fastapi import FastAPI, APIRouter, HTTPException, Depends
-from fastapi.security import HTTPBasic, HTTPBasicCredentials
+from fastapi import FastAPI, APIRouter, HTTPException, UploadFile, File, Form
+from fastapi.staticfiles import StaticFiles
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
@@ -11,6 +11,7 @@ from typing import List, Optional
 import uuid
 from datetime import datetime, timezone
 import hashlib
+import aiofiles
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
@@ -23,6 +24,10 @@ db = client[os.environ['DB_NAME']]
 # Create the main app
 app = FastAPI(title="Logi3A Soluções API")
 api_router = APIRouter(prefix="/api")
+
+# Uploads directory
+UPLOADS_DIR = ROOT_DIR / "uploads"
+UPLOADS_DIR.mkdir(exist_ok=True)
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
@@ -177,6 +182,44 @@ class EstatisticasTurma(BaseModel):
     media_aproveitamento: float
     total_atividades: int
     ranking: list
+
+# ============ LEITURA MODELS ============
+
+class Leitura(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    codigo: str
+    produto: str
+    tipo_leitura: str
+    tipo_operacao: str
+    setor: str = ""
+    quantidade: int = 1
+    aluno: str = ""
+    turma: str = ""
+    pontuacao: int = 0
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+class LeituraCreate(BaseModel):
+    codigo: str
+    produto: str
+    tipo_leitura: str
+    tipo_operacao: str
+    setor: str = ""
+    quantidade: int = 1
+    aluno: str = ""
+    turma: str = ""
+    pontuacao: int = 0
+
+# ============ QR IMAGE MODEL ============
+
+class QRImage(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    filename: str
+    original_name: str
+    content_type: str
+    url: str
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 # ============ USUARIOS ENDPOINTS ============
 
@@ -665,6 +708,83 @@ async def get_feedback(usuario_id: str):
         "aproveitamento": round(aproveitamento, 1),
         "tempo_medio": round(tempo_medio, 1)
     }
+
+# ============ LEITURAS ENDPOINTS ============
+
+@api_router.post("/leituras", response_model=Leitura, status_code=201)
+async def registrar_leitura(input: LeituraCreate):
+    leitura = Leitura(**input.model_dump())
+    doc = leitura.model_dump()
+    doc['timestamp'] = doc['timestamp'].isoformat()
+    await db.leituras.insert_one(doc)
+    return leitura
+
+@api_router.get("/leituras", response_model=List[Leitura])
+async def get_leituras(
+    usuario_id: Optional[str] = None,
+    turma: Optional[str] = None,
+    tipo_leitura: Optional[str] = None
+):
+    query = {}
+    if usuario_id:
+        query["aluno"] = usuario_id
+    if turma:
+        query["turma"] = turma
+    if tipo_leitura:
+        query["tipo_leitura"] = tipo_leitura
+
+    leituras = await db.leituras.find(query, {"_id": 0}).sort("timestamp", -1).to_list(1000)
+    for l in leituras:
+        if isinstance(l.get('timestamp'), str):
+            l['timestamp'] = datetime.fromisoformat(l['timestamp'])
+    return leituras
+
+@api_router.delete("/leituras")
+async def delete_all_leituras():
+    await db.leituras.delete_many({})
+    return {"message": "Histórico de leituras limpo com sucesso"}
+
+# ============ IMAGE UPLOAD ENDPOINTS ============
+
+@api_router.post("/upload-image")
+async def upload_image(file: UploadFile = File(...)):
+    allowed_types = ["image/jpeg", "image/png", "image/gif", "image/webp"]
+    if file.content_type not in allowed_types:
+        raise HTTPException(status_code=400, detail="Tipo de arquivo não suportado. Use JPEG, PNG, GIF ou WebP.")
+
+    file_ext = file.filename.split(".")[-1] if "." in file.filename else "png"
+    file_id = str(uuid.uuid4())
+    filename = f"{file_id}.{file_ext}"
+    filepath = UPLOADS_DIR / filename
+
+    async with aiofiles.open(filepath, 'wb') as f:
+        content = await file.read()
+        if len(content) > 5 * 1024 * 1024:
+            raise HTTPException(status_code=400, detail="Arquivo muito grande. Máximo 5MB.")
+        await f.write(content)
+
+    url = f"/api/images/{filename}"
+
+    image_doc = QRImage(
+        id=file_id,
+        filename=filename,
+        original_name=file.filename,
+        content_type=file.content_type,
+        url=url
+    )
+    doc = image_doc.model_dump()
+    doc['created_at'] = doc['created_at'].isoformat()
+    await db.qr_images.insert_one(doc)
+
+    return {"id": file_id, "url": url, "filename": filename}
+
+@api_router.get("/images/{filename}")
+async def get_image(filename: str):
+    from starlette.responses import FileResponse
+    filepath = UPLOADS_DIR / filename
+    if not filepath.exists():
+        raise HTTPException(status_code=404, detail="Imagem não encontrada")
+    return FileResponse(filepath)
 
 # ============ SEED DATA ============
 

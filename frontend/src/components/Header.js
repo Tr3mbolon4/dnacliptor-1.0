@@ -21,6 +21,7 @@ import {
   Sun,
   GraduationCap,
   Settings,
+  FileText,
 } from "lucide-react";
 
 export function Header() {
@@ -35,6 +36,7 @@ export function Header() {
     { path: "/dashboard", icon: BarChart3, label: "Dashboard" },
     { path: "/materiais", icon: Package, label: "Materiais" },
     { path: "/gerador-qr", icon: QrCode, label: "Gerador QR" },
+    { path: "/gerador-conteudo", icon: FileText, label: "QR Conteúdo" },
     { path: "/atividade", icon: GraduationCap, label: "Atividade" },
   ];
 
@@ -151,6 +153,15 @@ export function Header() {
                   >
                     <QrCode className="w-4 h-4" />
                     Gerador QR
+                  </Link>
+                </DropdownMenuItem>
+                <DropdownMenuItem asChild>
+                  <Link
+                    to="/gerador-conteudo"
+                    className="flex items-center gap-2 w-full"
+                  >
+                    <FileText className="w-4 h-4" />
+                    QR Conteúdo
                   </Link>
                 </DropdownMenuItem>
                 <DropdownMenuItem asChild>
