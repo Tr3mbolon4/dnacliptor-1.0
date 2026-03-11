@@ -1,0 +1,182 @@
+{
+  "brand_identity": {
+    "name": "Logi3A Soluções",
+    "tagline": "Simulador Educacional de Logística",
+    "sub_branding": "Escola Estadual Professora Elídia Tedesco de Oliveira",
+    "archetype": "The Performance Pro",
+    "emotional_tone": "Precision, Clarity, Industrial, Educational",
+    "theme_strategy": "Hybrid: Light Mode Default (Classroom optimized) with High-Contrast Dark Mode option"
+  },
+  "typography": {
+    "font_family": {
+      "headings": "Chivo, 'JetBrains Mono', sans-serif",
+      "body": "Inter, 'Public Sans', sans-serif",
+      "mono": "'JetBrains Mono', 'Fira Code', monospace"
+    },
+    "scale": {
+      "h1": "text-4xl md:text-5xl font-black tracking-tight leading-none",
+      "h2": "text-3xl md:text-4xl font-bold tracking-tight",
+      "h3": "text-2xl font-bold tracking-tight",
+      "body_lg": "text-lg leading-relaxed",
+      "body_base": "text-base leading-relaxed",
+      "caption": "text-sm text-muted-foreground uppercase tracking-widest"
+    },
+    "usage_rules": [
+      "Use 'Chivo' or 'JetBrains Mono' for all headings and data values (numbers).",
+      "Use 'Inter' for long-form text and instructions.",
+      "Use 'JetBrains Mono' for codes (QR content, Barcode numbers) to ensure character alignment."
+    ]
+  },
+  "colors": {
+    "palette": {
+      "primary": {
+        "DEFAULT": "#0052CC",
+        "foreground": "#FFFFFF",
+        "50": "#E6F0FF",
+        "100": "#CCE0FF",
+        "500": "#0052CC",
+        "600": "#0047B3",
+        "900": "#002966"
+      },
+      "secondary": {
+        "DEFAULT": "#0F172A",
+        "foreground": "#FFFFFF",
+        "100": "#F1F5F9",
+        "900": "#0F172A"
+      },
+      "accent": {
+        "DEFAULT": "#2563EB",
+        "foreground": "#FFFFFF"
+      },
+      "background": "#F8FAFC",
+      "foreground": "#0F172A",
+      "card": "#FFFFFF",
+      "card_foreground": "#0F172A",
+      "border": "#E2E8F0",
+      "success": "#10B981",
+      "warning": "#F59E0B",
+      "error": "#EF4444",
+      "info": "#3B82F6"
+    },
+    "gradients": {
+      "scanner_overlay": "linear-gradient(180deg, rgba(0,82,204,0) 0%, rgba(0,82,204,0.1) 50%, rgba(0,82,204,0) 100%)",
+      "hero_bg": "radial-gradient(circle at 50% 0%, #E6F0FF 0%, transparent 70%)"
+    }
+  },
+  "layout_strategy": {
+    "container": "max-w-7xl mx-auto px-4 sm:px-6 lg:px-8",
+    "spacing": {
+      "section_gap": "gap-8 md:gap-12",
+      "component_gap": "gap-6",
+      "internal_padding": "p-6 md:p-8"
+    },
+    "grid_system": {
+      "dashboard": "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6",
+      "bento_hero": "grid grid-cols-1 md:grid-cols-3 gap-4 auto-rows-[200px]"
+    },
+    "z_index": {
+      "toast": 100,
+      "modal": 50,
+      "scanner_overlay": 40,
+      "sticky_nav": 30,
+      "dropdown": 20
+    }
+  },
+  "components": {
+    "buttons": {
+      "primary": "bg-primary text-primary-foreground hover:bg-primary/90 shadow-sm rounded-md px-8 py-3 font-medium transition-all hover:scale-[1.02] active:scale-[0.98]",
+      "secondary": "bg-secondary text-secondary-foreground hover:bg-secondary/90 shadow-sm rounded-md px-6 py-2 font-medium",
+      "outline": "border-2 border-primary text-primary hover:bg-primary/10 rounded-md px-6 py-2 font-bold uppercase tracking-wide",
+      "ghost": "hover:bg-accent hover:text-accent-foreground rounded-md px-4 py-2",
+      "scanner_trigger": "h-24 w-24 rounded-full bg-primary border-4 border-white shadow-xl flex items-center justify-center animate-pulse hover:animate-none hover:scale-110 transition-transform"
+    },
+    "cards": {
+      "base": "bg-card text-card-foreground rounded-xl border shadow-sm transition-all hover:shadow-md",
+      "interactive": "cursor-pointer hover:border-primary/50 hover:shadow-lg active:scale-[0.99] transition-all duration-200",
+      "glass": "bg-white/80 backdrop-blur-md border border-white/20 shadow-lg"
+    },
+    "inputs": {
+      "base": "flex h-12 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+    },
+    "scanner_ui": {
+      "overlay": "absolute inset-0 border-2 border-primary/50 bg-black/10 z-10",
+      "viewfinder": "absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-64 h-64 border-4 border-primary rounded-lg shadow-[0_0_0_9999px_rgba(0,0,0,0.7)]"
+    }
+  },
+  "visual_enhancers": {
+    "shadows": {
+      "soft": "0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03)",
+      "glow_primary": "0 0 20px rgba(0, 82, 204, 0.3)",
+      "glow_success": "0 0 20px rgba(16, 185, 129, 0.3)"
+    },
+    "borders": {
+      "subtle": "border border-border",
+      "active": "border-2 border-primary"
+    },
+    "animations": {
+      "scan_line": "animate-[scan_2s_ease-in-out_infinite] bg-gradient-to-b from-transparent via-primary/50 to-transparent w-full h-1 absolute top-0",
+      "fade_in": "animate-in fade-in duration-500",
+      "slide_up": "animate-in slide-in-from-bottom-4 duration-500"
+    }
+  },
+  "assets": {
+    "icons": {
+      "library": "lucide-react",
+      "style": "stroke-width={1.5} size={24}",
+      "usage": {
+        "scanner": "Scan, Camera, Barcode",
+        "dashboard": "LayoutDashboard, BarChart3, TrendingUp",
+        "history": "History, FileClock, Search",
+        "settings": "Settings, Sliders",
+        "users": "Users, GraduationCap",
+        "logistics": "Package, Truck, Warehouse, Box"
+      }
+    },
+    "images": {
+      "placeholder_strategy": "Use CSS patterns or lucide-react icons in large sizes for empty states. Do not use external image URLs unless necessary.",
+      "logos": {
+        "school": "Use text-based logo or simple SVG icon"
+      }
+    }
+  },
+  "accessibility": {
+    "contrast": "Ensure 4.5:1 contrast ratio for normal text. Use 'text-foreground' on 'bg-background'.",
+    "focus_states": "All interactive elements must have visible focus rings.",
+    "aria_labels": "All icon-only buttons must have aria-label.",
+    "reduced_motion": "Respect 'prefers-reduced-motion' media query."
+  },
+  "universal_guidelines": [
+    "Do not use gradients for text.",
+    "Do not center align the entire app container.",
+    "Use 'sonner' for toast notifications.",
+    "Every interaction needs feedback (visual or auditory).",
+    "Use 'data-testid' for all interactive elements.",
+    "Marketing pages use custom HTML/Tailwind; App pages use Shadcn components.",
+    "Do NOT use 'Inter' for headings. Use 'Chivo' or 'JetBrains Mono'.",
+    "Blue (#0052CC) is the primary color. Black (#0F172A) is the secondary/text color."
+  ],
+  "implementation_steps": [
+    {
+      "phase": "Setup",
+      "action": "Install required fonts (Chivo, JetBrains Mono) and icons (lucide-react)."
+    },
+    {
+      "phase": "Global Styles",
+      "action": "Update tailwind.config.js with the defined color palette and font families."
+    },
+    {
+      "phase": "Components",
+      "action": "Customize Shadcn components (Card, Button, Input) to match the 'Performance Pro' archetype."
+    },
+    {
+      "phase": "Layout",
+      "action": "Build the 'Bento' grid layout for the Dashboard and the 'Viewfinder' layout for the Scanner."
+    }
+  ],
+  "technical_constraints": {
+    "file_extension": ".js",
+    "framework": "React (Create React App)",
+    "styling": "Tailwind CSS",
+    "ui_library": "Shadcn UI (adapted for JS)"
+  }
+}
