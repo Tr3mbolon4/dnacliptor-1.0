@@ -4,7 +4,7 @@ import json
 from datetime import datetime
 
 class Logi3AAPITester:
-    def __init__(self, base_url="https://logi3a-simulator.preview.emergentagent.com"):
+    def __init__(self, base_url="https://logi3a-supply-chain.preview.emergentagent.com"):
         self.base_url = base_url
         self.tests_run = 0
         self.tests_passed = 0
@@ -281,7 +281,7 @@ class Logi3AAPITester:
 
 def main():
     print("🚀 Starting Logi3A API Testing...")
-    print(f"Testing backend at: https://logi3a-simulator.preview.emergentagent.com")
+    print(f"Testing backend at: https://logi3a-supply-chain.preview.emergentagent.com")
     
     tester = Logi3AAPITester()
     

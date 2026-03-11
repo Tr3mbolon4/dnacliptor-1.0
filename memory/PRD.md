@@ -64,7 +64,7 @@ Sistema educacional de simulação de leitura de QR Code e código de barras par
 - POST /api/seed - Dados demonstração
 
 ## URLs
-- App: https://logi3a-simulator.preview.emergentagent.com
+- App: https://logi3a-supply-chain.preview.emergentagent.com
 - Login: /login
 - Painel Aluno: /aluno
 - Painel Professor: /professor
