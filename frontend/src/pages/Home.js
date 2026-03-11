@@ -105,6 +105,25 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-background">
+      {/* School Photo Banner */}
+      <div className="relative w-full h-40 sm:h-52 md:h-64 overflow-hidden">
+        <img
+          src="/escola-header.png"
+          alt="Escola Estadual Professora Elídia Tedesco de Oliveira"
+          className="w-full h-full object-cover"
+          data-testid="escola-header-image"
+        />
+        <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/20 to-transparent" />
+        <div className="absolute bottom-4 left-4 sm:bottom-6 sm:left-6">
+          <h2 className="text-white font-heading text-lg sm:text-xl md:text-2xl font-bold drop-shadow-lg">
+            E.E. Profª Elídia Tedesco de Oliveira
+          </h2>
+          <p className="text-white/80 text-xs sm:text-sm drop-shadow">
+            Escola Estadual - Ensino de Logística
+          </p>
+        </div>
+      </div>
+
       {/* Header */}
       <header className="bg-card border-b">
         <div className="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between">
