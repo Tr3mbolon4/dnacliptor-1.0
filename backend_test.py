@@ -10,6 +10,8 @@ class Logi3AAPITester:
         self.tests_passed = 0
         self.failed_tests = []
         self.created_materials = []
+        self.created_users = []
+        self.created_activities = []
 
     def run_test(self, name, method, endpoint, expected_status, data=None, check_response=True):
         """Run a single API test"""
@@ -72,7 +74,13 @@ class Logi3AAPITester:
         """Test basic API endpoints"""
         print("\n📍 Testing Root Endpoints...")
         
-        self.run_test("Root API", "GET", "", 200)
+        success, response = self.run_test("Root API Version Check", "GET", "", 200)
+        if success and 'version' in response:
+            if response['version'] == '2.0.0':
+                print(f"   ✅ API version correct: {response['version']}")
+            else:
+                print(f"   ⚠️  Expected version 2.0.0, got {response['version']}")
+        
         self.run_test("Health Check", "GET", "health", 200)
 
     def test_seed_data(self):
@@ -81,6 +89,73 @@ class Logi3AAPITester:
         
         success, response = self.run_test("Seed Demo Data", "POST", "seed", 200)
         return success
+
+    def test_usuarios_crud(self):
+        """Test user registration and login"""
+        print("\n👤 Testing User Management...")
+        
+        # Test user registration - Aluno
+        test_aluno = {
+            "nome": "Teste Aluno API",
+            "tipo": "aluno",
+            "turma": "3º Ano A",
+            "matricula": "TEST001",
+            "senha": "123456"
+        }
+        
+        success, created_aluno = self.run_test("Register Student", "POST", "usuarios/registro", 201, test_aluno)
+        if success and 'id' in created_aluno:
+            self.created_users.append(created_aluno['id'])
+            print(f"   Created student with ID: {created_aluno['id']}")
+            
+            # Test login
+            login_data = {
+                "nome": test_aluno['nome'],
+                "senha": test_aluno['senha'],
+                "tipo": test_aluno['tipo']
+            }
+            
+            success, login_response = self.run_test("Student Login", "POST", "usuarios/login", 200, login_data)
+            if success:
+                print(f"   ✅ Student login successful")
+        
+        # Test professor registration and login
+        test_professor = {
+            "nome": "Teste Professor API",
+            "tipo": "professor",
+            "senha": "123456"
+        }
+        
+        success, created_prof = self.run_test("Register Professor", "POST", "usuarios/registro", 201, test_professor)
+        if success and 'id' in created_prof:
+            self.created_users.append(created_prof['id'])
+            
+            # Test professor login
+            login_data = {
+                "nome": test_professor['nome'],
+                "senha": test_professor['senha'],
+                "tipo": test_professor['tipo']
+            }
+            
+            self.run_test("Professor Login", "POST", "usuarios/login", 200, login_data)
+        
+        # Test duplicate registration
+        duplicate_aluno = {
+            "nome": "Teste Aluno API",
+            "tipo": "aluno",
+            "turma": "3º Ano A",
+            "matricula": "TEST001",
+            "senha": "123456"
+        }
+        self.run_test("Duplicate Student Registration", "POST", "usuarios/registro", 400, duplicate_aluno, check_response=False)
+        
+        # Test invalid login
+        invalid_login = {
+            "nome": "Invalid User",
+            "senha": "wrongpass",
+            "tipo": "aluno"
+        }
+        self.run_test("Invalid Login", "POST", "usuarios/login", 401, invalid_login, check_response=False)
 
     def test_materiais_crud(self):
         """Test materials CRUD operations"""
@@ -93,8 +168,8 @@ class Logi3AAPITester:
 
         # Create new material
         test_material = {
-            "nome": "Material de Teste",
-            "codigo": "TEST123456",
+            "nome": "Material de Teste API",
+            "codigo": "TESTAPI123456",
             "setor": "Expedição",
             "quantidade": 100,
             "tipo_operacao": "Expedição",
@@ -116,7 +191,7 @@ class Logi3AAPITester:
             
             # Update material
             update_data = {
-                "nome": "Material de Teste Atualizado",
+                "nome": "Material de Teste API Atualizado",
                 "quantidade": 150
             }
             self.run_test("Update Material", "PUT", f"materiais/{material_id}", 200, update_data)
@@ -124,37 +199,37 @@ class Logi3AAPITester:
             # Test invalid material ID
             self.run_test("Get Non-existent Material", "GET", "materiais/invalid-id", 404, check_response=False)
 
-    def test_leituras_crud(self):
-        """Test readings CRUD operations"""
-        print("\n📊 Testing Readings CRUD...")
+    def test_atividades_crud(self):
+        """Test activities CRUD operations"""
+        print("\n📊 Testing Activities CRUD...")
         
-        # List readings
-        success, leituras = self.run_test("List Readings", "GET", "leituras", 200)
+        # List activities
+        success, atividades = self.run_test("List Activities", "GET", "atividades", 200)
         if success:
-            print(f"   Found {len(leituras)} readings")
+            print(f"   Found {len(atividades)} activities")
 
-        # Create test reading
-        test_leitura = {
-            "codigo": "TEST123456",
-            "produto": "Material de Teste",
-            "tipo_operacao": "Expedição",
-            "tipo_leitura": "qrcode",
-            "setor": "Expedição",
-            "quantidade": 1,
-            "aluno": "Teste User",
-            "turma": "Turma A",
-            "pontuacao": 10
-        }
-        
-        success, created_leitura = self.run_test("Create Reading", "POST", "leituras", 201, test_leitura)
-        if success and 'id' in created_leitura:
-            leitura_id = created_leitura['id']
-            print(f"   Created reading with ID: {leitura_id}")
+        # Create test activity (requires user first)
+        if self.created_users:
+            test_atividade = {
+                "usuario_id": self.created_users[0],
+                "codigo_lido": "TESTAPI123456",
+                "produto": "Material de Teste API",
+                "tipo_leitura": "qrcode",
+                "operacao_esperada": "Expedição",
+                "operacao_escolhida": "Expedição",
+                "tempo_segundos": 30
+            }
             
-            # Test filtering readings
-            self.run_test("Filter by QR Code", "GET", "leituras?tipo_leitura=qrcode", 200)
-            self.run_test("Filter by Operation", "GET", "leituras?tipo_operacao=Expedição", 200)
-            self.run_test("Filter by Student", "GET", "leituras?aluno=Teste", 200)
+            success, created_atividade = self.run_test("Create Activity", "POST", "atividades", 201, test_atividade)
+            if success and 'id' in created_atividade:
+                self.created_activities.append(created_atividade['id'])
+                print(f"   Created activity with ID: {created_atividade['id']}")
+                
+                # Test filtering activities
+                self.run_test("Filter Activities by User", "GET", f"atividades?usuario_id={self.created_users[0]}", 200)
+                self.run_test("Filter Activities by Type", "GET", "atividades?tipo_leitura=qrcode", 200)
+        else:
+            print("   ⚠️  Skipping activity tests - no users created")
 
     def test_estatisticas(self):
         """Test statistics endpoint"""
@@ -164,8 +239,9 @@ class Logi3AAPITester:
         if success:
             required_fields = [
                 'total_leituras', 'leituras_qrcode', 'leituras_barcode',
-                'total_materiais', 'leituras_por_operacao', 'leituras_por_setor',
-                'leituras_hoje', 'pontuacao_total'
+                'total_materiais', 'total_alunos', 'total_atividades',
+                'media_aproveitamento', 'leituras_por_operacao', 'leituras_por_setor',
+                'acertos_total', 'erros_total'
             ]
             
             missing_fields = [field for field in required_fields if field not in stats]
@@ -173,8 +249,10 @@ class Logi3AAPITester:
                 print(f"   ⚠️  Missing fields in stats: {missing_fields}")
             else:
                 print(f"   ✅ All required statistics fields present")
-                print(f"   Total readings: {stats['total_leituras']}")
+                print(f"   Total activities: {stats['total_atividades']}")
                 print(f"   Total materials: {stats['total_materiais']}")
+                print(f"   Total students: {stats['total_alunos']}")
+                print(f"   Average performance: {stats['media_aproveitamento']}%")
 
     def cleanup(self):
         """Clean up test data"""
@@ -211,8 +289,9 @@ def main():
         # Run all test suites
         tester.test_root_endpoints()
         tester.test_seed_data()
+        tester.test_usuarios_crud()
         tester.test_materiais_crud()
-        tester.test_leituras_crud()
+        tester.test_atividades_crud()
         tester.test_estatisticas()
         
         # Clean up test data

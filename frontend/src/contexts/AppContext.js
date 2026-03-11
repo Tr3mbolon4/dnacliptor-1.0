@@ -8,52 +8,37 @@ const AppContext = createContext(null);
 
 // Local storage keys
 const STORAGE_KEYS = {
-  LEITURAS: "logi3a_leituras",
-  MATERIAIS: "logi3a_materiais",
-  ALUNO: "logi3a_aluno",
-  TURMA: "logi3a_turma",
+  USER: "logi3a_user",
   DARK_MODE: "logi3a_dark_mode",
-  ACTIVITY_SCORES: "logi3a_activity_scores",
 };
 
 export function AppProvider({ children }) {
+  const [user, setUser] = useState(null);
   const [materiais, setMateriais] = useState([]);
-  const [leituras, setLeituras] = useState([]);
+  const [atividades, setAtividades] = useState([]);
   const [estatisticas, setEstatisticas] = useState(null);
   const [loading, setLoading] = useState(false);
-  const [alunoNome, setAlunoNome] = useState("");
-  const [turmaNome, setTurmaNome] = useState("");
   const [darkMode, setDarkMode] = useState(false);
-  const [activityMode, setActivityMode] = useState(false);
-  const [activityScores, setActivityScores] = useState([]);
+  const [turmas, setTurmas] = useState([]);
 
-  // Load from localStorage on mount
+  // Load user from localStorage on mount
   useEffect(() => {
-    const savedAluno = localStorage.getItem(STORAGE_KEYS.ALUNO);
-    const savedTurma = localStorage.getItem(STORAGE_KEYS.TURMA);
+    const savedUser = localStorage.getItem(STORAGE_KEYS.USER);
     const savedDarkMode = localStorage.getItem(STORAGE_KEYS.DARK_MODE);
-    const savedScores = localStorage.getItem(STORAGE_KEYS.ACTIVITY_SCORES);
-
-    if (savedAluno) setAlunoNome(savedAluno);
-    if (savedTurma) setTurmaNome(savedTurma);
+    
+    if (savedUser) {
+      try {
+        setUser(JSON.parse(savedUser));
+      } catch (e) {
+        console.error("Error parsing saved user", e);
+      }
+    }
+    
     if (savedDarkMode === "true") {
       setDarkMode(true);
       document.documentElement.classList.add("dark");
     }
-    if (savedScores) {
-      try {
-        setActivityScores(JSON.parse(savedScores));
-      } catch (e) {
-        console.error("Error parsing activity scores", e);
-      }
-    }
   }, []);
-
-  // Save aluno/turma to localStorage
-  useEffect(() => {
-    localStorage.setItem(STORAGE_KEYS.ALUNO, alunoNome);
-    localStorage.setItem(STORAGE_KEYS.TURMA, turmaNome);
-  }, [alunoNome, turmaNome]);
 
   // Toggle dark mode
   const toggleDarkMode = useCallback(() => {
@@ -69,7 +54,66 @@ export function AppProvider({ children }) {
     });
   }, []);
 
-  // Fetch materiais from API
+  // ============ AUTH ============
+
+  const login = useCallback(async (nome, senha, tipo) => {
+    setLoading(true);
+    try {
+      const response = await axios.post(`${API}/usuarios/login`, { nome, senha, tipo });
+      const userData = response.data;
+      setUser(userData);
+      localStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(userData));
+      return userData;
+    } catch (error) {
+      console.error("Login error:", error);
+      throw error;
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  const registrar = useCallback(async (nome, turma, matricula, senha, tipo = "aluno") => {
+    setLoading(true);
+    try {
+      const response = await axios.post(`${API}/usuarios/registro`, {
+        nome,
+        turma,
+        matricula,
+        senha,
+        tipo,
+      });
+      const userData = response.data;
+      setUser(userData);
+      localStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(userData));
+      return userData;
+    } catch (error) {
+      console.error("Register error:", error);
+      throw error;
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  const logout = useCallback(() => {
+    setUser(null);
+    localStorage.removeItem(STORAGE_KEYS.USER);
+  }, []);
+
+  const refreshUser = useCallback(async () => {
+    if (!user?.id) return;
+    try {
+      const response = await axios.get(`${API}/usuarios/${user.id}`);
+      const userData = response.data;
+      setUser(userData);
+      localStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(userData));
+      return userData;
+    } catch (error) {
+      console.error("Refresh user error:", error);
+    }
+  }, [user?.id]);
+
+  // ============ MATERIAIS ============
+
   const fetchMateriais = useCallback(async () => {
     setLoading(true);
     try {
@@ -78,147 +122,79 @@ export function AppProvider({ children }) {
       return response.data;
     } catch (error) {
       console.error("Error fetching materiais:", error);
-      // Try to load from localStorage as fallback
-      const cached = localStorage.getItem(STORAGE_KEYS.MATERIAIS);
-      if (cached) {
-        try {
-          const data = JSON.parse(cached);
-          setMateriais(data);
-          return data;
-        } catch (e) {
-          console.error("Error parsing cached materiais", e);
-        }
-      }
       return [];
     } finally {
       setLoading(false);
     }
   }, []);
 
-  // Create material
   const createMaterial = useCallback(async (data) => {
-    try {
-      const response = await axios.post(`${API}/materiais`, data);
-      setMateriais((prev) => [...prev, response.data]);
-      return response.data;
-    } catch (error) {
-      console.error("Error creating material:", error);
-      throw error;
-    }
+    const response = await axios.post(`${API}/materiais`, data);
+    setMateriais((prev) => [...prev, response.data]);
+    return response.data;
   }, []);
 
-  // Update material
   const updateMaterial = useCallback(async (id, data) => {
-    try {
-      const response = await axios.put(`${API}/materiais/${id}`, data);
-      setMateriais((prev) =>
-        prev.map((m) => (m.id === id ? response.data : m))
-      );
-      return response.data;
-    } catch (error) {
-      console.error("Error updating material:", error);
-      throw error;
-    }
+    const response = await axios.put(`${API}/materiais/${id}`, data);
+    setMateriais((prev) => prev.map((m) => (m.id === id ? response.data : m)));
+    return response.data;
   }, []);
 
-  // Delete material
   const deleteMaterial = useCallback(async (id) => {
-    try {
-      await axios.delete(`${API}/materiais/${id}`);
-      setMateriais((prev) => prev.filter((m) => m.id !== id));
-    } catch (error) {
-      console.error("Error deleting material:", error);
-      throw error;
-    }
+    await axios.delete(`${API}/materiais/${id}`);
+    setMateriais((prev) => prev.filter((m) => m.id !== id));
   }, []);
 
-  // Find material by code
   const findMaterialByCode = useCallback(
-    (codigo) => {
-      return materiais.find((m) => m.codigo === codigo);
-    },
+    (codigo) => materiais.find((m) => m.codigo === codigo),
     [materiais]
   );
 
-  // Fetch leituras from API
-  const fetchLeituras = useCallback(async (filters = {}) => {
+  // ============ ATIVIDADES ============
+
+  const fetchAtividades = useCallback(async (filters = {}) => {
     setLoading(true);
     try {
       const params = new URLSearchParams();
-      if (filters.tipo_leitura) params.append("tipo_leitura", filters.tipo_leitura);
-      if (filters.tipo_operacao) params.append("tipo_operacao", filters.tipo_operacao);
-      if (filters.aluno) params.append("aluno", filters.aluno);
+      if (filters.usuario_id) params.append("usuario_id", filters.usuario_id);
       if (filters.turma) params.append("turma", filters.turma);
+      if (filters.tipo_leitura) params.append("tipo_leitura", filters.tipo_leitura);
 
-      const response = await axios.get(`${API}/leituras?${params.toString()}`);
-      setLeituras(response.data);
+      const response = await axios.get(`${API}/atividades?${params.toString()}`);
+      setAtividades(response.data);
       return response.data;
     } catch (error) {
-      console.error("Error fetching leituras:", error);
-      // Try to load from localStorage as fallback
-      const cached = localStorage.getItem(STORAGE_KEYS.LEITURAS);
-      if (cached) {
-        try {
-          const data = JSON.parse(cached);
-          setLeituras(data);
-          return data;
-        } catch (e) {
-          console.error("Error parsing cached leituras", e);
-        }
-      }
+      console.error("Error fetching atividades:", error);
       return [];
     } finally {
       setLoading(false);
     }
   }, []);
 
-  // Create leitura
-  const createLeitura = useCallback(async (data) => {
-    try {
-      const leituraData = {
-        ...data,
-        aluno: alunoNome || data.aluno || "",
-        turma: turmaNome || data.turma || "",
-      };
-      const response = await axios.post(`${API}/leituras`, leituraData);
-      setLeituras((prev) => [response.data, ...prev]);
-      
-      // Save to localStorage as backup
-      const allLeituras = [response.data, ...leituras];
-      localStorage.setItem(STORAGE_KEYS.LEITURAS, JSON.stringify(allLeituras.slice(0, 100)));
-      
-      return response.data;
-    } catch (error) {
-      console.error("Error creating leitura:", error);
-      // Save locally if API fails
-      const localLeitura = {
-        ...data,
-        id: `local_${Date.now()}`,
-        timestamp: new Date().toISOString(),
-        aluno: alunoNome || data.aluno || "",
-        turma: turmaNome || data.turma || "",
-      };
-      setLeituras((prev) => [localLeitura, ...prev]);
-      const allLeituras = [localLeitura, ...leituras];
-      localStorage.setItem(STORAGE_KEYS.LEITURAS, JSON.stringify(allLeituras.slice(0, 100)));
-      return localLeitura;
-    }
-  }, [alunoNome, turmaNome, leituras]);
+  const registrarAtividade = useCallback(async (data) => {
+    if (!user?.id) throw new Error("Usuário não logado");
+    
+    const atividadeData = {
+      usuario_id: user.id,
+      ...data,
+    };
+    
+    const response = await axios.post(`${API}/atividades`, atividadeData);
+    setAtividades((prev) => [response.data, ...prev]);
+    
+    // Refresh user stats
+    await refreshUser();
+    
+    return response.data;
+  }, [user?.id, refreshUser]);
 
-  // Clear all leituras
-  const clearLeituras = useCallback(async () => {
-    try {
-      await axios.delete(`${API}/leituras`);
-      setLeituras([]);
-      localStorage.removeItem(STORAGE_KEYS.LEITURAS);
-    } catch (error) {
-      console.error("Error clearing leituras:", error);
-      setLeituras([]);
-      localStorage.removeItem(STORAGE_KEYS.LEITURAS);
-    }
+  const clearAtividades = useCallback(async () => {
+    await axios.delete(`${API}/atividades`);
+    setAtividades([]);
   }, []);
 
-  // Fetch estatisticas
+  // ============ ESTATISTICAS ============
+
   const fetchEstatisticas = useCallback(async () => {
     try {
       const response = await axios.get(`${API}/estatisticas`);
@@ -226,93 +202,106 @@ export function AppProvider({ children }) {
       return response.data;
     } catch (error) {
       console.error("Error fetching estatisticas:", error);
-      // Calculate from local data
-      const stats = {
-        total_leituras: leituras.length,
-        leituras_qrcode: leituras.filter((l) => l.tipo_leitura === "qrcode").length,
-        leituras_barcode: leituras.filter((l) => l.tipo_leitura === "barcode").length,
-        total_materiais: materiais.length,
-        leituras_por_operacao: {},
-        leituras_por_setor: {},
-        leituras_hoje: 0,
-        pontuacao_total: leituras.reduce((acc, l) => acc + (l.pontuacao || 0), 0),
-      };
-      setEstatisticas(stats);
-      return stats;
+      return null;
     }
-  }, [leituras, materiais]);
+  }, []);
 
-  // Seed demo data
+  const fetchEstatisticasTurma = useCallback(async (turma) => {
+    try {
+      const response = await axios.get(`${API}/estatisticas/turma/${encodeURIComponent(turma)}`);
+      return response.data;
+    } catch (error) {
+      console.error("Error fetching turma stats:", error);
+      return null;
+    }
+  }, []);
+
+  const fetchTurmas = useCallback(async () => {
+    try {
+      const response = await axios.get(`${API}/turmas`);
+      setTurmas(response.data);
+      return response.data;
+    } catch (error) {
+      console.error("Error fetching turmas:", error);
+      return [];
+    }
+  }, []);
+
+  const fetchAlunos = useCallback(async (turma = null) => {
+    try {
+      let url = `${API}/usuarios?tipo=aluno`;
+      if (turma) url += `&turma=${encodeURIComponent(turma)}`;
+      const response = await axios.get(url);
+      return response.data;
+    } catch (error) {
+      console.error("Error fetching alunos:", error);
+      return [];
+    }
+  }, []);
+
+  // ============ FEEDBACK ============
+
+  const fetchFeedback = useCallback(async (usuarioId) => {
+    try {
+      const response = await axios.get(`${API}/feedback/${usuarioId}`);
+      return response.data;
+    } catch (error) {
+      console.error("Error fetching feedback:", error);
+      return { feedbacks: [], aproveitamento: 0, tempo_medio: 0 };
+    }
+  }, []);
+
+  // ============ SEED ============
+
   const seedDemoData = useCallback(async () => {
     try {
       await axios.post(`${API}/seed`);
       await fetchMateriais();
     } catch (error) {
-      console.error("Error seeding demo data:", error);
+      console.error("Error seeding data:", error);
     }
   }, [fetchMateriais]);
 
-  // Activity mode functions
-  const startActivityMode = useCallback(() => {
-    setActivityMode(true);
-  }, []);
-
-  const endActivityMode = useCallback(() => {
-    setActivityMode(false);
-  }, []);
-
-  const saveActivityScore = useCallback((score) => {
-    const newScore = {
-      id: Date.now(),
-      aluno: alunoNome,
-      turma: turmaNome,
-      pontuacao: score.pontuacao,
-      leituras: score.leituras,
-      tempo: score.tempo,
-      data: new Date().toISOString(),
-    };
-    setActivityScores((prev) => {
-      const updated = [newScore, ...prev].slice(0, 50);
-      localStorage.setItem(STORAGE_KEYS.ACTIVITY_SCORES, JSON.stringify(updated));
-      return updated;
-    });
-  }, [alunoNome, turmaNome]);
-
   const value = {
     // State
+    user,
     materiais,
-    leituras,
+    atividades,
     estatisticas,
     loading,
-    alunoNome,
-    turmaNome,
     darkMode,
-    activityMode,
-    activityScores,
+    turmas,
     
-    // Setters
-    setAlunoNome,
-    setTurmaNome,
+    // Auth
+    login,
+    registrar,
+    logout,
+    refreshUser,
+    
+    // Settings
     toggleDarkMode,
     
-    // Material functions
+    // Materiais
     fetchMateriais,
     createMaterial,
     updateMaterial,
     deleteMaterial,
     findMaterialByCode,
     
-    // Leitura functions
-    fetchLeituras,
-    createLeitura,
-    clearLeituras,
+    // Atividades
+    fetchAtividades,
+    registrarAtividade,
+    clearAtividades,
     
-    // Other functions
+    // Estatisticas
     fetchEstatisticas,
+    fetchEstatisticasTurma,
+    fetchTurmas,
+    fetchAlunos,
+    fetchFeedback,
+    
+    // Seed
     seedDemoData,
-    startActivityMode,
-    endActivityMode,
-    saveActivityScore,
   };
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;

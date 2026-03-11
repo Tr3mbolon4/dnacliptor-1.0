@@ -1,4 +1,5 @@
-from fastapi import FastAPI, APIRouter, HTTPException
+from fastapi import FastAPI, APIRouter, HTTPException, Depends
+from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
@@ -9,6 +10,7 @@ from pydantic import BaseModel, Field, ConfigDict
 from typing import List, Optional
 import uuid
 from datetime import datetime, timezone
+import hashlib
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
@@ -20,18 +22,82 @@ db = client[os.environ['DB_NAME']]
 
 # Create the main app
 app = FastAPI(title="Logi3A Soluções API")
-
-# Create a router with the /api prefix
 api_router = APIRouter(prefix="/api")
 
-# Configure logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-)
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
+# ============ HELPERS ============
+
+def hash_password(password: str) -> str:
+    return hashlib.sha256(password.encode()).hexdigest()
+
+def calculate_performance(acertos: int, erros: int, tempo_total: int, atividades: int) -> dict:
+    """Calculate student performance metrics"""
+    total = acertos + erros
+    aproveitamento = (acertos / total * 100) if total > 0 else 0
+    tempo_medio = (tempo_total / atividades) if atividades > 0 else 0
+    
+    # Classification
+    if aproveitamento >= 90:
+        classificacao = "Excelente"
+    elif aproveitamento >= 70:
+        classificacao = "Bom"
+    elif aproveitamento >= 50:
+        classificacao = "Regular"
+    else:
+        classificacao = "Precisa melhorar"
+    
+    return {
+        "aproveitamento": round(aproveitamento, 1),
+        "tempo_medio": round(tempo_medio, 1),
+        "classificacao": classificacao
+    }
+
 # ============ MODELS ============
+
+class Usuario(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    nome: str
+    tipo: str  # "aluno" ou "professor"
+    turma: Optional[str] = ""
+    matricula: Optional[str] = ""
+    senha_hash: str
+    pontuacao_total: int = 0
+    acertos: int = 0
+    erros: int = 0
+    tempo_total: int = 0
+    atividades_concluidas: int = 0
+    sequencia_acertos: int = 0
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+class UsuarioCreate(BaseModel):
+    nome: str
+    tipo: str
+    turma: Optional[str] = ""
+    matricula: Optional[str] = ""
+    senha: str
+
+class UsuarioLogin(BaseModel):
+    nome: str
+    senha: str
+    tipo: str
+
+class UsuarioResponse(BaseModel):
+    id: str
+    nome: str
+    tipo: str
+    turma: Optional[str] = ""
+    matricula: Optional[str] = ""
+    pontuacao_total: int = 0
+    acertos: int = 0
+    erros: int = 0
+    tempo_total: int = 0
+    atividades_concluidas: int = 0
+    aproveitamento: float = 0
+    tempo_medio: float = 0
+    classificacao: str = "Iniciante"
 
 class Material(BaseModel):
     model_config = ConfigDict(extra="ignore")
@@ -43,6 +109,7 @@ class Material(BaseModel):
     tipo_operacao: str
     descricao: Optional[str] = ""
     localizacao: Optional[str] = ""
+    is_demo: bool = False
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
@@ -64,40 +131,306 @@ class MaterialUpdate(BaseModel):
     descricao: Optional[str] = None
     localizacao: Optional[str] = None
 
-class Leitura(BaseModel):
+class Atividade(BaseModel):
     model_config = ConfigDict(extra="ignore")
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
-    codigo: str
+    usuario_id: str
+    usuario_nome: str
+    turma: str
+    codigo_lido: str
     produto: str
-    tipo_operacao: str
     tipo_leitura: str  # qrcode ou barcode
-    setor: Optional[str] = ""
-    quantidade: Optional[int] = 0
-    aluno: Optional[str] = ""
-    turma: Optional[str] = ""
-    pontuacao: Optional[int] = 0
+    operacao_esperada: str
+    operacao_escolhida: str
+    acerto: bool
+    tempo_segundos: int
+    pontuacao: int
+    detalhes_pontuacao: dict = {}
     timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
-class LeituraCreate(BaseModel):
-    codigo: str
+class AtividadeCreate(BaseModel):
+    usuario_id: str
+    codigo_lido: str
     produto: str
-    tipo_operacao: str
     tipo_leitura: str
-    setor: Optional[str] = ""
-    quantidade: Optional[int] = 0
-    aluno: Optional[str] = ""
-    turma: Optional[str] = ""
-    pontuacao: Optional[int] = 0
+    operacao_esperada: str
+    operacao_escolhida: str
+    tempo_segundos: int
 
 class Estatisticas(BaseModel):
     total_leituras: int
     leituras_qrcode: int
     leituras_barcode: int
     total_materiais: int
+    total_alunos: int
+    total_atividades: int
+    media_aproveitamento: float
     leituras_por_operacao: dict
     leituras_por_setor: dict
-    leituras_hoje: int
-    pontuacao_total: int
+    acertos_total: int
+    erros_total: int
+
+class EstatisticasTurma(BaseModel):
+    turma: str
+    total_alunos: int
+    media_pontuacao: float
+    media_aproveitamento: float
+    total_atividades: int
+    ranking: list
+
+# ============ USUARIOS ENDPOINTS ============
+
+@api_router.post("/usuarios/registro", response_model=UsuarioResponse, status_code=201)
+async def registrar_usuario(input: UsuarioCreate):
+    # Check if user already exists
+    existing = await db.usuarios.find_one({"nome": input.nome, "tipo": input.tipo})
+    if existing:
+        raise HTTPException(status_code=400, detail="Usuário já existe")
+    
+    usuario = Usuario(
+        nome=input.nome,
+        tipo=input.tipo,
+        turma=input.turma,
+        matricula=input.matricula,
+        senha_hash=hash_password(input.senha)
+    )
+    
+    doc = usuario.model_dump()
+    doc['created_at'] = doc['created_at'].isoformat()
+    await db.usuarios.insert_one(doc)
+    
+    perf = calculate_performance(0, 0, 0, 0)
+    return UsuarioResponse(
+        id=usuario.id,
+        nome=usuario.nome,
+        tipo=usuario.tipo,
+        turma=usuario.turma,
+        matricula=usuario.matricula,
+        pontuacao_total=0,
+        acertos=0,
+        erros=0,
+        tempo_total=0,
+        atividades_concluidas=0,
+        aproveitamento=perf["aproveitamento"],
+        tempo_medio=perf["tempo_medio"],
+        classificacao=perf["classificacao"]
+    )
+
+@api_router.post("/usuarios/login", response_model=UsuarioResponse)
+async def login_usuario(input: UsuarioLogin):
+    usuario = await db.usuarios.find_one({
+        "nome": input.nome,
+        "tipo": input.tipo,
+        "senha_hash": hash_password(input.senha)
+    }, {"_id": 0})
+    
+    if not usuario:
+        raise HTTPException(status_code=401, detail="Credenciais inválidas")
+    
+    perf = calculate_performance(
+        usuario.get("acertos", 0),
+        usuario.get("erros", 0),
+        usuario.get("tempo_total", 0),
+        usuario.get("atividades_concluidas", 0)
+    )
+    
+    return UsuarioResponse(
+        id=usuario["id"],
+        nome=usuario["nome"],
+        tipo=usuario["tipo"],
+        turma=usuario.get("turma", ""),
+        matricula=usuario.get("matricula", ""),
+        pontuacao_total=usuario.get("pontuacao_total", 0),
+        acertos=usuario.get("acertos", 0),
+        erros=usuario.get("erros", 0),
+        tempo_total=usuario.get("tempo_total", 0),
+        atividades_concluidas=usuario.get("atividades_concluidas", 0),
+        aproveitamento=perf["aproveitamento"],
+        tempo_medio=perf["tempo_medio"],
+        classificacao=perf["classificacao"]
+    )
+
+@api_router.get("/usuarios/{usuario_id}", response_model=UsuarioResponse)
+async def get_usuario(usuario_id: str):
+    usuario = await db.usuarios.find_one({"id": usuario_id}, {"_id": 0})
+    if not usuario:
+        raise HTTPException(status_code=404, detail="Usuário não encontrado")
+    
+    perf = calculate_performance(
+        usuario.get("acertos", 0),
+        usuario.get("erros", 0),
+        usuario.get("tempo_total", 0),
+        usuario.get("atividades_concluidas", 0)
+    )
+    
+    return UsuarioResponse(
+        id=usuario["id"],
+        nome=usuario["nome"],
+        tipo=usuario["tipo"],
+        turma=usuario.get("turma", ""),
+        matricula=usuario.get("matricula", ""),
+        pontuacao_total=usuario.get("pontuacao_total", 0),
+        acertos=usuario.get("acertos", 0),
+        erros=usuario.get("erros", 0),
+        tempo_total=usuario.get("tempo_total", 0),
+        atividades_concluidas=usuario.get("atividades_concluidas", 0),
+        aproveitamento=perf["aproveitamento"],
+        tempo_medio=perf["tempo_medio"],
+        classificacao=perf["classificacao"]
+    )
+
+@api_router.get("/usuarios", response_model=List[UsuarioResponse])
+async def get_usuarios(tipo: Optional[str] = None, turma: Optional[str] = None):
+    query = {}
+    if tipo:
+        query["tipo"] = tipo
+    if turma:
+        query["turma"] = turma
+    
+    usuarios = await db.usuarios.find(query, {"_id": 0}).to_list(1000)
+    result = []
+    
+    for u in usuarios:
+        perf = calculate_performance(
+            u.get("acertos", 0),
+            u.get("erros", 0),
+            u.get("tempo_total", 0),
+            u.get("atividades_concluidas", 0)
+        )
+        result.append(UsuarioResponse(
+            id=u["id"],
+            nome=u["nome"],
+            tipo=u["tipo"],
+            turma=u.get("turma", ""),
+            matricula=u.get("matricula", ""),
+            pontuacao_total=u.get("pontuacao_total", 0),
+            acertos=u.get("acertos", 0),
+            erros=u.get("erros", 0),
+            tempo_total=u.get("tempo_total", 0),
+            atividades_concluidas=u.get("atividades_concluidas", 0),
+            aproveitamento=perf["aproveitamento"],
+            tempo_medio=perf["tempo_medio"],
+            classificacao=perf["classificacao"]
+        ))
+    
+    return result
+
+# ============ ATIVIDADES ENDPOINTS ============
+
+@api_router.post("/atividades", response_model=Atividade, status_code=201)
+async def registrar_atividade(input: AtividadeCreate):
+    # Get user
+    usuario = await db.usuarios.find_one({"id": input.usuario_id}, {"_id": 0})
+    if not usuario:
+        raise HTTPException(status_code=404, detail="Usuário não encontrado")
+    
+    # Calculate points
+    acerto = input.operacao_esperada.lower() == input.operacao_escolhida.lower()
+    pontuacao = 0
+    detalhes = {}
+    
+    # Leitura correta
+    pontuacao += 10
+    detalhes["leitura"] = 10
+    
+    # Operação correta
+    if acerto:
+        pontuacao += 15
+        detalhes["operacao"] = 15
+    else:
+        pontuacao -= 5
+        detalhes["operacao"] = -5
+    
+    # Tempo
+    if input.tempo_segundos <= 30:
+        pontuacao += 10
+        detalhes["tempo"] = 10
+    elif input.tempo_segundos <= 60:
+        pontuacao += 7
+        detalhes["tempo"] = 7
+    elif input.tempo_segundos <= 120:
+        pontuacao += 4
+        detalhes["tempo"] = 4
+    else:
+        pontuacao += 2
+        detalhes["tempo"] = 2
+    
+    # Atividade concluída
+    pontuacao += 20
+    detalhes["conclusao"] = 20
+    
+    # Bonus por sequência de acertos
+    sequencia = usuario.get("sequencia_acertos", 0)
+    if acerto:
+        sequencia += 1
+        if sequencia >= 3:
+            pontuacao += 10
+            detalhes["bonus_sequencia"] = 10
+            sequencia = 0  # Reset after bonus
+    else:
+        sequencia = 0
+    
+    # Create atividade
+    atividade = Atividade(
+        usuario_id=input.usuario_id,
+        usuario_nome=usuario["nome"],
+        turma=usuario.get("turma", ""),
+        codigo_lido=input.codigo_lido,
+        produto=input.produto,
+        tipo_leitura=input.tipo_leitura,
+        operacao_esperada=input.operacao_esperada,
+        operacao_escolhida=input.operacao_escolhida,
+        acerto=acerto,
+        tempo_segundos=input.tempo_segundos,
+        pontuacao=pontuacao,
+        detalhes_pontuacao=detalhes
+    )
+    
+    doc = atividade.model_dump()
+    doc['timestamp'] = doc['timestamp'].isoformat()
+    await db.atividades.insert_one(doc)
+    
+    # Update user stats
+    update_data = {
+        "$inc": {
+            "pontuacao_total": pontuacao,
+            "acertos": 1 if acerto else 0,
+            "erros": 0 if acerto else 1,
+            "tempo_total": input.tempo_segundos,
+            "atividades_concluidas": 1
+        },
+        "$set": {
+            "sequencia_acertos": sequencia
+        }
+    }
+    await db.usuarios.update_one({"id": input.usuario_id}, update_data)
+    
+    return atividade
+
+@api_router.get("/atividades", response_model=List[Atividade])
+async def get_atividades(
+    usuario_id: Optional[str] = None,
+    turma: Optional[str] = None,
+    tipo_leitura: Optional[str] = None
+):
+    query = {}
+    if usuario_id:
+        query["usuario_id"] = usuario_id
+    if turma:
+        query["turma"] = turma
+    if tipo_leitura:
+        query["tipo_leitura"] = tipo_leitura
+    
+    atividades = await db.atividades.find(query, {"_id": 0}).sort("timestamp", -1).to_list(1000)
+    for a in atividades:
+        if isinstance(a.get('timestamp'), str):
+            a['timestamp'] = datetime.fromisoformat(a['timestamp'])
+    return atividades
+
+@api_router.delete("/atividades")
+async def delete_all_atividades():
+    await db.atividades.delete_many({})
+    return {"message": "Histórico limpo com sucesso"}
 
 # ============ MATERIAIS ENDPOINTS ============
 
@@ -167,98 +500,171 @@ async def delete_material(material_id: str):
         raise HTTPException(status_code=404, detail="Material não encontrado")
     return {"message": "Material deletado com sucesso"}
 
-# ============ LEITURAS ENDPOINTS ============
-
-@api_router.get("/leituras", response_model=List[Leitura])
-async def get_leituras(
-    tipo_leitura: Optional[str] = None,
-    tipo_operacao: Optional[str] = None,
-    aluno: Optional[str] = None,
-    turma: Optional[str] = None
-):
-    query = {}
-    if tipo_leitura:
-        query["tipo_leitura"] = tipo_leitura
-    if tipo_operacao:
-        query["tipo_operacao"] = tipo_operacao
-    if aluno:
-        query["aluno"] = {"$regex": aluno, "$options": "i"}
-    if turma:
-        query["turma"] = {"$regex": turma, "$options": "i"}
-    
-    leituras = await db.leituras.find(query, {"_id": 0}).sort("timestamp", -1).to_list(1000)
-    for l in leituras:
-        if isinstance(l.get('timestamp'), str):
-            l['timestamp'] = datetime.fromisoformat(l['timestamp'])
-    return leituras
-
-@api_router.post("/leituras", response_model=Leitura, status_code=201)
-async def create_leitura(input: LeituraCreate):
-    leitura_dict = input.model_dump()
-    leitura_obj = Leitura(**leitura_dict)
-    doc = leitura_obj.model_dump()
-    doc['timestamp'] = doc['timestamp'].isoformat()
-    await db.leituras.insert_one(doc)
-    return leitura_obj
-
-@api_router.delete("/leituras")
-async def delete_all_leituras():
-    await db.leituras.delete_many({})
-    return {"message": "Histórico limpo com sucesso"}
-
-@api_router.delete("/leituras/{leitura_id}")
-async def delete_leitura(leitura_id: str):
-    result = await db.leituras.delete_one({"id": leitura_id})
-    if result.deleted_count == 0:
-        raise HTTPException(status_code=404, detail="Leitura não encontrada")
-    return {"message": "Leitura deletada com sucesso"}
-
-# ============ ESTATISTICAS ENDPOINT ============
+# ============ ESTATISTICAS ENDPOINTS ============
 
 @api_router.get("/estatisticas", response_model=Estatisticas)
 async def get_estatisticas():
-    total_leituras = await db.leituras.count_documents({})
-    leituras_qrcode = await db.leituras.count_documents({"tipo_leitura": "qrcode"})
-    leituras_barcode = await db.leituras.count_documents({"tipo_leitura": "barcode"})
+    total_atividades = await db.atividades.count_documents({})
+    leituras_qrcode = await db.atividades.count_documents({"tipo_leitura": "qrcode"})
+    leituras_barcode = await db.atividades.count_documents({"tipo_leitura": "barcode"})
     total_materiais = await db.materiais.count_documents({})
+    total_alunos = await db.usuarios.count_documents({"tipo": "aluno"})
     
-    # Leituras por operação
-    pipeline_op = [
-        {"$group": {"_id": "$tipo_operacao", "count": {"$sum": 1}}}
-    ]
-    operacoes = await db.leituras.aggregate(pipeline_op).to_list(100)
+    # Acertos e erros totais
+    acertos_total = await db.atividades.count_documents({"acerto": True})
+    erros_total = await db.atividades.count_documents({"acerto": False})
+    
+    # Média de aproveitamento
+    alunos = await db.usuarios.find({"tipo": "aluno"}, {"_id": 0}).to_list(1000)
+    if alunos:
+        total_aprov = sum([
+            (a.get("acertos", 0) / max(a.get("acertos", 0) + a.get("erros", 0), 1) * 100)
+            for a in alunos
+        ])
+        media_aproveitamento = total_aprov / len(alunos)
+    else:
+        media_aproveitamento = 0
+    
+    # Atividades por operação
+    pipeline_op = [{"$group": {"_id": "$operacao_escolhida", "count": {"$sum": 1}}}]
+    operacoes = await db.atividades.aggregate(pipeline_op).to_list(100)
     leituras_por_operacao = {op["_id"]: op["count"] for op in operacoes if op["_id"]}
     
-    # Leituras por setor
-    pipeline_setor = [
-        {"$group": {"_id": "$setor", "count": {"$sum": 1}}}
-    ]
-    setores = await db.leituras.aggregate(pipeline_setor).to_list(100)
+    # Atividades por setor (from materials)
+    pipeline_setor = [{"$group": {"_id": "$setor", "count": {"$sum": 1}}}]
+    setores = await db.materiais.aggregate(pipeline_setor).to_list(100)
     leituras_por_setor = {s["_id"]: s["count"] for s in setores if s["_id"]}
     
-    # Leituras hoje
-    today_start = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
-    leituras_hoje = await db.leituras.count_documents({
-        "timestamp": {"$gte": today_start.isoformat()}
-    })
-    
-    # Pontuação total
-    pipeline_pontos = [
-        {"$group": {"_id": None, "total": {"$sum": "$pontuacao"}}}
-    ]
-    pontos = await db.leituras.aggregate(pipeline_pontos).to_list(1)
-    pontuacao_total = pontos[0]["total"] if pontos else 0
-    
     return Estatisticas(
-        total_leituras=total_leituras,
+        total_leituras=total_atividades,
         leituras_qrcode=leituras_qrcode,
         leituras_barcode=leituras_barcode,
         total_materiais=total_materiais,
+        total_alunos=total_alunos,
+        total_atividades=total_atividades,
+        media_aproveitamento=round(media_aproveitamento, 1),
         leituras_por_operacao=leituras_por_operacao,
         leituras_por_setor=leituras_por_setor,
-        leituras_hoje=leituras_hoje,
-        pontuacao_total=pontuacao_total
+        acertos_total=acertos_total,
+        erros_total=erros_total
     )
+
+@api_router.get("/estatisticas/turma/{turma}", response_model=EstatisticasTurma)
+async def get_estatisticas_turma(turma: str):
+    alunos = await db.usuarios.find({"tipo": "aluno", "turma": turma}, {"_id": 0}).to_list(1000)
+    
+    if not alunos:
+        raise HTTPException(status_code=404, detail="Turma não encontrada")
+    
+    # Calcular métricas
+    total_alunos = len(alunos)
+    total_pontuacao = sum([a.get("pontuacao_total", 0) for a in alunos])
+    total_atividades = sum([a.get("atividades_concluidas", 0) for a in alunos])
+    
+    media_pontuacao = total_pontuacao / total_alunos if total_alunos > 0 else 0
+    
+    # Média aproveitamento
+    aproveitamentos = []
+    for a in alunos:
+        total = a.get("acertos", 0) + a.get("erros", 0)
+        if total > 0:
+            aproveitamentos.append(a.get("acertos", 0) / total * 100)
+    media_aproveitamento = sum(aproveitamentos) / len(aproveitamentos) if aproveitamentos else 0
+    
+    # Ranking
+    ranking = sorted(alunos, key=lambda x: x.get("pontuacao_total", 0), reverse=True)
+    ranking_list = [
+        {
+            "posicao": i + 1,
+            "nome": a["nome"],
+            "pontuacao": a.get("pontuacao_total", 0),
+            "atividades": a.get("atividades_concluidas", 0)
+        }
+        for i, a in enumerate(ranking[:10])
+    ]
+    
+    return EstatisticasTurma(
+        turma=turma,
+        total_alunos=total_alunos,
+        media_pontuacao=round(media_pontuacao, 1),
+        media_aproveitamento=round(media_aproveitamento, 1),
+        total_atividades=total_atividades,
+        ranking=ranking_list
+    )
+
+@api_router.get("/turmas")
+async def get_turmas():
+    pipeline = [
+        {"$match": {"tipo": "aluno"}},
+        {"$group": {"_id": "$turma", "count": {"$sum": 1}}}
+    ]
+    turmas = await db.usuarios.aggregate(pipeline).to_list(100)
+    return [{"turma": t["_id"], "alunos": t["count"]} for t in turmas if t["_id"]]
+
+# ============ FEEDBACK ENDPOINT ============
+
+@api_router.get("/feedback/{usuario_id}")
+async def get_feedback(usuario_id: str):
+    usuario = await db.usuarios.find_one({"id": usuario_id}, {"_id": 0})
+    if not usuario:
+        raise HTTPException(status_code=404, detail="Usuário não encontrado")
+    
+    # Get recent activities
+    atividades = await db.atividades.find(
+        {"usuario_id": usuario_id},
+        {"_id": 0}
+    ).sort("timestamp", -1).limit(20).to_list(20)
+    
+    feedbacks = []
+    
+    # Analyze performance
+    acertos = usuario.get("acertos", 0)
+    erros = usuario.get("erros", 0)
+    total = acertos + erros
+    aproveitamento = (acertos / total * 100) if total > 0 else 0
+    
+    if aproveitamento >= 80:
+        feedbacks.append("Você está indo muito bem! Continue assim!")
+    elif aproveitamento >= 60:
+        feedbacks.append("Bom progresso! Você está no caminho certo.")
+    else:
+        feedbacks.append("Continue praticando para melhorar seu desempenho.")
+    
+    # Analyze by operation
+    if atividades:
+        ops_certas = {}
+        ops_erradas = {}
+        for a in atividades:
+            op = a.get("operacao_esperada", "")
+            if a.get("acerto"):
+                ops_certas[op] = ops_certas.get(op, 0) + 1
+            else:
+                ops_erradas[op] = ops_erradas.get(op, 0) + 1
+        
+        # Best operation
+        if ops_certas:
+            melhor_op = max(ops_certas, key=ops_certas.get)
+            feedbacks.append(f"Você está indo muito bem em {melhor_op}.")
+        
+        # Needs improvement
+        if ops_erradas:
+            pior_op = max(ops_erradas, key=ops_erradas.get)
+            feedbacks.append(f"Você precisa melhorar em {pior_op}.")
+    
+    # Analyze time
+    tempo_medio = usuario.get("tempo_total", 0) / max(usuario.get("atividades_concluidas", 1), 1)
+    if tempo_medio <= 30:
+        feedbacks.append("Seu tempo de execução está ótimo!")
+    elif tempo_medio <= 60:
+        feedbacks.append("Seu tempo está bom, mas pode melhorar.")
+    else:
+        feedbacks.append("Tente ser mais rápido nas próximas atividades.")
+    
+    return {
+        "feedbacks": feedbacks,
+        "aproveitamento": round(aproveitamento, 1),
+        "tempo_medio": round(tempo_medio, 1)
+    }
 
 # ============ SEED DATA ============
 
@@ -269,84 +675,59 @@ async def seed_data():
     if count > 0:
         return {"message": "Dados já existem", "materiais": count}
     
-    # Sample materials for demonstration
-    materiais_exemplo = [
-        {
-            "id": str(uuid.uuid4()),
-            "nome": "Parafuso M8",
-            "codigo": "789456123",
-            "setor": "Expedição",
-            "quantidade": 500,
-            "tipo_operacao": "Expedição",
-            "descricao": "Parafuso de aço galvanizado M8x30mm",
-            "localizacao": "Prateleira A3",
-            "created_at": datetime.now(timezone.utc).isoformat(),
-            "updated_at": datetime.now(timezone.utc).isoformat()
-        },
-        {
-            "id": str(uuid.uuid4()),
-            "nome": "Caixa de Papelão",
-            "codigo": "456789123",
-            "setor": "Estoque A",
-            "quantidade": 200,
-            "tipo_operacao": "Recebimento",
-            "descricao": "Caixa de papelão 40x30x20cm",
-            "localizacao": "Estoque A - Corredor 2",
-            "created_at": datetime.now(timezone.utc).isoformat(),
-            "updated_at": datetime.now(timezone.utc).isoformat()
-        },
-        {
-            "id": str(uuid.uuid4()),
-            "nome": "Porca Sextavada",
-            "codigo": "321654987",
-            "setor": "Estoque B",
-            "quantidade": 1000,
-            "tipo_operacao": "Estoque",
-            "descricao": "Porca sextavada M8 zincada",
-            "localizacao": "Prateleira B1",
-            "created_at": datetime.now(timezone.utc).isoformat(),
-            "updated_at": datetime.now(timezone.utc).isoformat()
-        },
-        {
-            "id": str(uuid.uuid4()),
-            "nome": "Fita Adesiva",
-            "codigo": "654321789",
-            "setor": "Expedição",
-            "quantidade": 50,
-            "tipo_operacao": "Expedição",
-            "descricao": "Fita adesiva transparente 48mm",
-            "localizacao": "Área de Embalagem",
-            "created_at": datetime.now(timezone.utc).isoformat(),
-            "updated_at": datetime.now(timezone.utc).isoformat()
-        },
-        {
-            "id": str(uuid.uuid4()),
-            "nome": "Etiqueta Adesiva",
-            "codigo": "987321654",
-            "setor": "Identificação",
-            "quantidade": 5000,
-            "tipo_operacao": "Identificação",
-            "descricao": "Etiqueta adesiva branca 100x50mm",
-            "localizacao": "Almoxarifado",
-            "created_at": datetime.now(timezone.utc).isoformat(),
-            "updated_at": datetime.now(timezone.utc).isoformat()
-        }
+    # Demo materials
+    materiais_demo = [
+        {"id": str(uuid.uuid4()), "nome": "Parafuso M8", "codigo": "789456123", "setor": "Expedição", "quantidade": 500, "tipo_operacao": "Expedição", "descricao": "Parafuso de aço galvanizado M8x30mm", "localizacao": "Prateleira A3", "is_demo": True},
+        {"id": str(uuid.uuid4()), "nome": "Caixa de Papelão", "codigo": "456789123", "setor": "Estoque A", "quantidade": 200, "tipo_operacao": "Recebimento", "descricao": "Caixa 40x30x20cm", "localizacao": "Estoque A - Corredor 2", "is_demo": True},
+        {"id": str(uuid.uuid4()), "nome": "Porca Sextavada", "codigo": "321654987", "setor": "Estoque B", "quantidade": 1000, "tipo_operacao": "Estoque", "descricao": "Porca M8 zincada", "localizacao": "Prateleira B1", "is_demo": True},
+        {"id": str(uuid.uuid4()), "nome": "Fita Adesiva", "codigo": "654321789", "setor": "Expedição", "quantidade": 50, "tipo_operacao": "Expedição", "descricao": "Fita transparente 48mm", "localizacao": "Área de Embalagem", "is_demo": True},
+        {"id": str(uuid.uuid4()), "nome": "Etiqueta Logística", "codigo": "987321654", "setor": "Identificação", "quantidade": 5000, "tipo_operacao": "Identificação", "descricao": "Etiqueta 100x50mm", "localizacao": "Almoxarifado", "is_demo": True},
+        {"id": str(uuid.uuid4()), "nome": "Palete de Madeira", "codigo": "111222333", "setor": "Estoque A", "quantidade": 20, "tipo_operacao": "Estoque", "descricao": "Palete 1200x1000mm", "localizacao": "Área de Paletes", "is_demo": True},
+        {"id": str(uuid.uuid4()), "nome": "Bobina de Filme", "codigo": "444555666", "setor": "Expedição", "quantidade": 15, "tipo_operacao": "Expedição", "descricao": "Filme stretch 500mm", "localizacao": "Área de Embalagem", "is_demo": True},
+        {"id": str(uuid.uuid4()), "nome": "Produto Devolvido", "codigo": "777888999", "setor": "Logística Reversa", "quantidade": 3, "tipo_operacao": "Logística Reversa", "descricao": "Item em processo de devolução", "localizacao": "Área de Devoluções", "is_demo": True},
+        {"id": str(uuid.uuid4()), "nome": "Material Recebido", "codigo": "123123123", "setor": "Recebimento", "quantidade": 100, "tipo_operacao": "Recebimento", "descricao": "Material aguardando conferência", "localizacao": "Doca de Recebimento", "is_demo": True},
+        {"id": str(uuid.uuid4()), "nome": "Produto para Envio", "codigo": "456456456", "setor": "Expedição", "quantidade": 25, "tipo_operacao": "Expedição", "descricao": "Produto pronto para despacho", "localizacao": "Doca de Expedição", "is_demo": True},
     ]
     
-    await db.materiais.insert_many(materiais_exemplo)
-    return {"message": "Dados de exemplo criados com sucesso", "materiais": len(materiais_exemplo)}
+    for m in materiais_demo:
+        m["created_at"] = datetime.now(timezone.utc).isoformat()
+        m["updated_at"] = datetime.now(timezone.utc).isoformat()
+    
+    await db.materiais.insert_many(materiais_demo)
+    
+    # Create demo professor
+    professor_exists = await db.usuarios.find_one({"nome": "Professor Demo", "tipo": "professor"})
+    if not professor_exists:
+        professor = {
+            "id": str(uuid.uuid4()),
+            "nome": "Professor Demo",
+            "tipo": "professor",
+            "turma": "",
+            "matricula": "",
+            "senha_hash": hash_password("123456"),
+            "pontuacao_total": 0,
+            "acertos": 0,
+            "erros": 0,
+            "tempo_total": 0,
+            "atividades_concluidas": 0,
+            "sequencia_acertos": 0,
+            "created_at": datetime.now(timezone.utc).isoformat()
+        }
+        await db.usuarios.insert_one(professor)
+    
+    return {"message": "Dados de demonstração criados com sucesso", "materiais": len(materiais_demo)}
 
-# ============ ROOT ENDPOINT ============
+# ============ ROOT ENDPOINTS ============
 
 @api_router.get("/")
 async def root():
-    return {"message": "API Logi3A Soluções", "version": "1.0.0"}
+    return {"message": "API Logi3A Soluções", "version": "2.0.0"}
 
 @api_router.get("/health")
 async def health():
     return {"status": "healthy"}
 
-# Include the router in the main app
+# Include router
 app.include_router(api_router)
 
 app.add_middleware(
