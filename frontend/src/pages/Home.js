@@ -257,11 +257,11 @@ export default function Home() {
                 </CardContent>
               </Card>
             </Link>
-            <Link to="/materiais">
+            <Link to="/produtos">
               <Card className="card-hover cursor-pointer">
                 <CardContent className="p-4 text-center">
                   <Package className="w-8 h-8 text-primary mx-auto mb-2" />
-                  <p className="text-sm font-medium">Materiais</p>
+                  <p className="text-sm font-medium">Produtos</p>
                 </CardContent>
               </Card>
             </Link>

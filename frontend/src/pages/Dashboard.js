@@ -32,11 +32,19 @@ import {
 const COLORS = ["#0052CC", "#10B981", "#F59E0B", "#EF4444", "#8B5CF6"];
 
 export default function Dashboard() {
-  const { estatisticas, fetchEstatisticas, leituras, materiais, loading } = useApp();
+  const {
+    estatisticas,
+    fetchEstatisticas,
+    fetchLeituras,
+    leituras,
+    materiais,
+    loading,
+  } = useApp();
 
   useEffect(() => {
     fetchEstatisticas();
-  }, [fetchEstatisticas]);
+    fetchLeituras();
+  }, [fetchEstatisticas, fetchLeituras]);
 
   const operacoesData = estatisticas?.leituras_por_operacao
     ? Object.entries(estatisticas.leituras_por_operacao).map(([name, value]) => ({

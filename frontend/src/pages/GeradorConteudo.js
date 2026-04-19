@@ -16,7 +16,7 @@ import {
   ArrowRight, Scan, Eye, ChevronDown, ChevronUp, Upload,
 } from "lucide-react";
 
-const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
+const BACKEND_URL = (process.env.REACT_APP_BACKEND_URL || "http://localhost:8000").replace(/\/+$/, "");
 
 export default function GeradorConteudo() {
   const { uploadImage } = useApp();

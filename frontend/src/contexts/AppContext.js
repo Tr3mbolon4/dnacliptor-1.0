@@ -1,7 +1,8 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from "react";
 import axios from "axios";
+import { normalizeMaterial } from "../lib/products";
 
-const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
+const BACKEND_URL = (process.env.REACT_APP_BACKEND_URL || "http://localhost:8000").replace(/\/+$/, "");
 const API = `${BACKEND_URL}/api`;
 
 const AppContext = createContext(null);
@@ -129,8 +130,9 @@ export function AppProvider({ children }) {
     setLoading(true);
     try {
       const response = await axios.get(`${API}/materiais`);
-      setMateriais(response.data);
-      return response.data;
+      const normalized = response.data.map(normalizeMaterial);
+      setMateriais(normalized);
+      return normalized;
     } catch (error) {
       console.error("Error fetching materiais:", error);
       return [];
@@ -141,14 +143,22 @@ export function AppProvider({ children }) {
 
   const createMaterial = useCallback(async (data) => {
     const response = await axios.post(`${API}/materiais`, data);
-    setMateriais((prev) => [...prev, response.data]);
-    return response.data;
+    const createdMaterial = normalizeMaterial({ ...data, ...response.data });
+    setMateriais((prev) => [...prev, createdMaterial]);
+    return createdMaterial;
   }, []);
 
   const updateMaterial = useCallback(async (id, data) => {
     const response = await axios.put(`${API}/materiais/${id}`, data);
-    setMateriais((prev) => prev.map((m) => (m.id === id ? response.data : m)));
-    return response.data;
+    let updatedMaterial = null;
+    setMateriais((prev) =>
+      prev.map((m) => {
+        if (m.id !== id) return m;
+        updatedMaterial = normalizeMaterial({ ...m, ...data, ...response.data });
+        return updatedMaterial;
+      })
+    );
+    return updatedMaterial || normalizeMaterial({ ...data, ...response.data, id });
   }, []);
 
   const deleteMaterial = useCallback(async (id) => {

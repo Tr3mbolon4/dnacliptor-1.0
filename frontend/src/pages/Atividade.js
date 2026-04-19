@@ -89,7 +89,7 @@ export default function Atividade() {
         clearInterval(timerRef.current);
       }
     };
-  }, [isActive]);
+  }, [handleEndActivity, isActive, timeRemaining]);
 
   const formatTime = (seconds) => {
     const mins = Math.floor(seconds / 60);

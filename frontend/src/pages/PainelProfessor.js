@@ -448,11 +448,11 @@ export default function PainelProfessor() {
 
         {/* Quick Links */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <Link to="/materiais">
+          <Link to="/produtos">
             <Card className="card-hover cursor-pointer">
               <CardContent className="p-4 text-center">
                 <Package className="w-8 h-8 text-primary mx-auto mb-2" />
-                <p className="text-sm font-medium">Gerenciar Materiais</p>
+                <p className="text-sm font-medium">Gerenciar Produtos</p>
               </CardContent>
             </Card>
           </Link>

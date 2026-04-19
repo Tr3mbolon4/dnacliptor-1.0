@@ -48,6 +48,7 @@ function App() {
             <Route path="/historico" element={<Historico />} />
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/materiais" element={<Materiais />} />
+            <Route path="/produtos" element={<Materiais />} />
             <Route path="/gerador-qr" element={<GeradorQR />} />
             <Route path="/gerador-conteudo" element={<GeradorConteudo />} />
             <Route path="/configuracoes" element={<Configuracoes />} />

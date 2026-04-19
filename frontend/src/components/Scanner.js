@@ -1,4 +1,5 @@
-import React, { useEffect, useRef, useState, useCallback } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
 import { Html5Qrcode } from "html5-qrcode";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
 import { Button } from "./ui/button";
@@ -12,28 +13,27 @@ import {
 } from "./ui/select";
 import { useApp } from "../contexts/AppContext";
 import {
-  parseQRContent,
   calculatePoints,
-  playSuccessSound,
-  playErrorSound,
-  getOperationMessage,
   getOperationBadgeClass,
+  getOperationMessage,
+  parseQRContent,
+  playErrorSound,
+  playSuccessSound,
 } from "../lib/utils";
 import {
+  ArrowLeft,
   Camera,
   CameraOff,
   CheckCircle2,
-  XCircle,
-  Package,
-  MapPin,
   Hash,
   Layers,
-  ArrowLeft,
+  MapPin,
+  Package,
   RotateCcw,
-  Zap,
   SwitchCamera,
+  XCircle,
+  Zap,
 } from "lucide-react";
-import { Link } from "react-router-dom";
 
 const OPERACOES = [
   { value: "Recebimento", label: "Recebimento" },
@@ -44,6 +44,7 @@ const OPERACOES = [
 ];
 
 export function Scanner({ type = "qrcode", onScanComplete }) {
+  const navigate = useNavigate();
   const html5QrcodeRef = useRef(null);
   const [scanning, setScanning] = useState(false);
   const [result, setResult] = useState(null);
@@ -53,65 +54,118 @@ export function Scanner({ type = "qrcode", onScanComplete }) {
   const [cameras, setCameras] = useState([]);
   const [selectedCamera, setSelectedCamera] = useState(null);
   const [permissionGranted, setPermissionGranted] = useState(false);
+  const [scanStartedAt, setScanStartedAt] = useState(null);
 
-  const { createLeitura, findMaterialByCode, activityMode } = useApp();
+  const {
+    activityMode,
+    createLeitura,
+    fetchMateriais,
+    findMaterialByCode,
+    materiais,
+    registrarAtividade,
+    user,
+  } = useApp();
 
-  // Get available cameras on mount
+  useEffect(() => {
+    if (materiais.length === 0) {
+      fetchMateriais();
+    }
+  }, [fetchMateriais, materiais.length]);
+
   useEffect(() => {
     const getCameras = async () => {
       try {
         const devices = await Html5Qrcode.getCameras();
-        if (devices && devices.length > 0) {
+        if (devices?.length) {
           setCameras(devices);
-          // Prefer back camera (environment facing)
           const backCamera = devices.find(
-            (d) =>
-              d.label.toLowerCase().includes("back") ||
-              d.label.toLowerCase().includes("rear") ||
-              d.label.toLowerCase().includes("traseira") ||
-              d.label.toLowerCase().includes("environment")
+            (device) =>
+              device.label.toLowerCase().includes("back") ||
+              device.label.toLowerCase().includes("rear") ||
+              device.label.toLowerCase().includes("traseira") ||
+              device.label.toLowerCase().includes("environment")
           );
           setSelectedCamera(backCamera?.id || devices[devices.length - 1].id);
           setPermissionGranted(true);
         }
       } catch (err) {
         console.log("Error getting cameras:", err);
-        // Permission not granted yet, will request when starting
       }
     };
+
     getCameras();
+  }, []);
+
+  const stopScanner = useCallback(async () => {
+    if (html5QrcodeRef.current) {
+      try {
+        const state = html5QrcodeRef.current.getState();
+        if (state === 2) {
+          await html5QrcodeRef.current.stop();
+        }
+      } catch (e) {
+        console.log("Error stopping scanner:", e);
+      }
+    }
+
+    setScanning(false);
+    setCameraStatus("idle");
+  }, []);
+
+  const buildQuickCreateUrl = useCallback((scanResult) => {
+    const params = new URLSearchParams({
+      quickCreate: "1",
+      codigo: scanResult.codigo,
+      nome: scanResult.produto === "Produto Não Cadastrado" ? "" : scanResult.produto,
+      quantidade: String(scanResult.quantidade || 1),
+      setor: scanResult.setor || "",
+      tipo_operacao: scanResult.tipo_operacao || "",
+    });
+
+    return `/produtos?${params.toString()}`;
   }, []);
 
   const handleScanSuccess = useCallback(
     async (decodedText) => {
-      // Prevent multiple rapid scans
       if (result) return;
 
       playSuccessSound();
 
+      const activitySeconds = Math.max(
+        1,
+        Math.round((Date.now() - (scanStartedAt || Date.now())) / 1000)
+      );
+
+      let matchedMaterial = null;
       let scanResult;
 
       if (type === "qrcode") {
         const parsed = parseQRContent(decodedText);
+        matchedMaterial = findMaterialByCode(parsed.codigo || decodedText);
         scanResult = {
-          codigo: parsed.codigo || decodedText,
-          produto: parsed.produto || "Produto Desconhecido",
-          setor: parsed.setor || selectedOperacao,
-          quantidade: parseInt(parsed.quantidade) || 1,
+          codigo: matchedMaterial?.codigo || parsed.codigo || decodedText,
+          produto: matchedMaterial?.nome || parsed.produto || "Produto Não Cadastrado",
+          setor: matchedMaterial?.setor || parsed.setor || selectedOperacao,
+          quantidade: matchedMaterial?.quantidade || Number.parseInt(parsed.quantidade, 10) || 1,
           tipo_operacao: selectedOperacao,
           tipo_leitura: "qrcode",
+          operacao_esperada: matchedMaterial?.tipo_operacao || selectedOperacao,
+          localizacao: matchedMaterial?.localizacao || "",
+          exists: Boolean(matchedMaterial),
           raw: decodedText,
         };
       } else {
-        const material = findMaterialByCode(decodedText);
+        matchedMaterial = findMaterialByCode(decodedText);
         scanResult = {
           codigo: decodedText,
-          produto: material?.nome || "Produto Não Cadastrado",
-          setor: material?.setor || selectedOperacao,
-          quantidade: material?.quantidade || 1,
+          produto: matchedMaterial?.nome || "Produto Não Cadastrado",
+          setor: matchedMaterial?.setor || selectedOperacao,
+          quantidade: matchedMaterial?.quantidade || 1,
           tipo_operacao: selectedOperacao,
           tipo_leitura: "barcode",
-          localizacao: material?.localizacao || "",
+          operacao_esperada: matchedMaterial?.tipo_operacao || selectedOperacao,
+          localizacao: matchedMaterial?.localizacao || "",
+          exists: Boolean(matchedMaterial),
         };
       }
 
@@ -127,14 +181,46 @@ export function Scanner({ type = "qrcode", onScanComplete }) {
         console.error("Error saving leitura:", err);
       }
 
-      // Stop scanner after successful read
-      stopScanner();
+      if (user?.id && user.tipo === "aluno") {
+        try {
+          await registrarAtividade({
+            codigo_lido: scanResult.codigo,
+            produto: scanResult.produto,
+            tipo_leitura: scanResult.tipo_leitura,
+            operacao_esperada: scanResult.operacao_esperada,
+            operacao_escolhida: selectedOperacao,
+            tempo_segundos: activitySeconds,
+          });
+        } catch (err) {
+          console.error("Error saving atividade:", err);
+        }
+      }
+
+      await stopScanner();
 
       if (onScanComplete) {
         onScanComplete(scanResult);
+        return;
+      }
+
+      if (matchedMaterial) {
+        navigate(`/produtos?codigo=${encodeURIComponent(scanResult.codigo)}`);
       }
     },
-    [result, type, selectedOperacao, findMaterialByCode, activityMode, createLeitura, onScanComplete]
+    [
+      activityMode,
+      createLeitura,
+      findMaterialByCode,
+      navigate,
+      onScanComplete,
+      registrarAtividade,
+      result,
+      scanStartedAt,
+      selectedOperacao,
+      stopScanner,
+      type,
+      user,
+    ]
   );
 
   const startScanner = useCallback(async () => {
@@ -144,37 +230,30 @@ export function Scanner({ type = "qrcode", onScanComplete }) {
     setError(null);
     setScanning(true);
     setCameraStatus("starting");
+    setScanStartedAt(Date.now());
 
     try {
-      // Create scanner instance if not exists
       if (!html5QrcodeRef.current) {
-        html5QrcodeRef.current = new Html5Qrcode("qr-reader", {
-          verbose: false,
-        });
+        html5QrcodeRef.current = new Html5Qrcode("qr-reader", { verbose: false });
       }
 
-      // Configuration for scanning
       const config = {
         fps: 10,
         qrbox: { width: 250, height: 250 },
-        aspectRatio: 1.0,
+        aspectRatio: 1,
       };
 
-      // Try to use back camera first (environment facing)
       let cameraId = selectedCamera;
-      
       if (!cameraId) {
-        // Request camera permission and get cameras
         const devices = await Html5Qrcode.getCameras();
-        if (devices && devices.length > 0) {
+        if (devices?.length) {
           setCameras(devices);
-          // Find back camera
           const backCamera = devices.find(
-            (d) =>
-              d.label.toLowerCase().includes("back") ||
-              d.label.toLowerCase().includes("rear") ||
-              d.label.toLowerCase().includes("traseira") ||
-              d.label.toLowerCase().includes("environment")
+            (device) =>
+              device.label.toLowerCase().includes("back") ||
+              device.label.toLowerCase().includes("rear") ||
+              device.label.toLowerCase().includes("traseira") ||
+              device.label.toLowerCase().includes("environment")
           );
           cameraId = backCamera?.id || devices[devices.length - 1].id;
           setSelectedCamera(cameraId);
@@ -182,66 +261,42 @@ export function Scanner({ type = "qrcode", onScanComplete }) {
         }
       }
 
+      const errorHandler = (errorMessage) => {
+        if (!errorMessage.includes("NotFoundException")) {
+          console.log("Scan error:", errorMessage);
+        }
+      };
+
       if (!cameraId) {
-        // Fallback to facingMode if no camera ID
         await html5QrcodeRef.current.start(
           { facingMode: "environment" },
           config,
           handleScanSuccess,
-          (errorMessage) => {
-            // Ignore normal scanning errors
-            if (!errorMessage.includes("NotFoundException")) {
-              console.log("Scan error:", errorMessage);
-            }
-          }
+          errorHandler
         );
       } else {
-        await html5QrcodeRef.current.start(
-          cameraId,
-          config,
-          handleScanSuccess,
-          (errorMessage) => {
-            if (!errorMessage.includes("NotFoundException")) {
-              console.log("Scan error:", errorMessage);
-            }
-          }
-        );
+        await html5QrcodeRef.current.start(cameraId, config, handleScanSuccess, errorHandler);
       }
 
       setCameraStatus("active");
     } catch (err) {
       console.error("Error starting scanner:", err);
-      
+
       let errorMsg = "Erro ao iniciar câmera.";
       if (err.message?.includes("Permission")) {
-        errorMsg = "Permissão de câmera negada. Por favor, permita o acesso à câmera nas configurações do navegador.";
+        errorMsg = "Permissão de câmera negada. Libere o acesso no navegador.";
       } else if (err.message?.includes("NotFound")) {
         errorMsg = "Nenhuma câmera encontrada no dispositivo.";
       } else if (err.message?.includes("NotReadable")) {
-        errorMsg = "Câmera em uso por outro aplicativo.";
+        errorMsg = "A câmera está em uso por outro aplicativo.";
       }
-      
+
       setError(errorMsg);
       setScanning(false);
       setCameraStatus("error");
       playErrorSound();
     }
-  }, [scanning, selectedCamera, handleScanSuccess]);
-
-  const stopScanner = useCallback(async () => {
-    if (html5QrcodeRef.current) {
-      try {
-        const state = html5QrcodeRef.current.getState();
-        if (state === 2) { // SCANNING state
-          await html5QrcodeRef.current.stop();
-        }
-      } catch (e) {
-        console.log("Error stopping scanner:", e);
-      }
-    }
-    setScanning(false);
-    setCameraStatus("idle");
-  }, []);
+  }, [handleScanSuccess, scanning, selectedCamera]);
 
   const resetScanner = useCallback(() => {
     setResult(null);
@@ -251,22 +306,21 @@ export function Scanner({ type = "qrcode", onScanComplete }) {
 
   const switchCamera = useCallback(async () => {
     if (cameras.length < 2) return;
-    
-    const currentIndex = cameras.findIndex((c) => c.id === selectedCamera);
+
+    const currentIndex = cameras.findIndex((camera) => camera.id === selectedCamera);
     const nextIndex = (currentIndex + 1) % cameras.length;
     const nextCamera = cameras[nextIndex];
-    
+
     setSelectedCamera(nextCamera.id);
-    
+
     if (scanning) {
       await stopScanner();
       setTimeout(() => {
         startScanner();
       }, 300);
     }
-  }, [cameras, selectedCamera, scanning, stopScanner, startScanner]);
+  }, [cameras, scanning, selectedCamera, startScanner, stopScanner]);
 
-  // Cleanup on unmount
   useEffect(() => {
     return () => {
       if (html5QrcodeRef.current) {
@@ -317,10 +371,9 @@ export function Scanner({ type = "qrcode", onScanComplete }) {
 
   return (
     <div className="space-y-6">
-      {/* Controls */}
       <Card>
         <CardHeader className="pb-4">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex items-center gap-3">
               <Link to="/">
                 <Button variant="ghost" size="icon" data-testid="back-button">
@@ -331,8 +384,8 @@ export function Scanner({ type = "qrcode", onScanComplete }) {
                 <CardTitle className="font-heading text-xl">
                   {type === "qrcode" ? "Leitor de QR Code" : "Leitor de Código de Barras"}
                 </CardTitle>
-                <p className="text-sm text-muted-foreground mt-1">
-                  Aponte a câmera traseira para o código
+                <p className="mt-1 text-sm text-muted-foreground">
+                  Aponte a câmera traseira para o código do produto.
                 </p>
               </div>
             </div>
@@ -340,12 +393,9 @@ export function Scanner({ type = "qrcode", onScanComplete }) {
           </div>
         </CardHeader>
         <CardContent className="space-y-4">
-          {/* Operation selector */}
-          <div className="flex flex-col sm:flex-row gap-4">
+          <div className="flex flex-col gap-4 sm:flex-row">
             <div className="flex-1">
-              <label className="text-sm font-medium mb-2 block">
-                Tipo de Operação
-              </label>
+              <label className="mb-2 block text-sm font-medium">Tipo de Operação</label>
               <Select
                 value={selectedOperacao}
                 onValueChange={setSelectedOperacao}
@@ -363,13 +413,9 @@ export function Scanner({ type = "qrcode", onScanComplete }) {
                 </SelectContent>
               </Select>
             </div>
-            <div className="flex gap-2 items-end">
+            <div className="flex items-end gap-2">
               {!scanning ? (
-                <Button
-                  onClick={startScanner}
-                  className="gap-2"
-                  data-testid="start-scanner-btn"
-                >
+                <Button onClick={startScanner} className="gap-2" data-testid="start-scanner-btn">
                   <Camera className="w-4 h-4" />
                   Iniciar Câmera
                 </Button>
@@ -398,59 +444,45 @@ export function Scanner({ type = "qrcode", onScanComplete }) {
               )}
             </div>
           </div>
-          
-          {/* Camera info */}
+
           {permissionGranted && cameras.length > 0 && (
             <p className="text-xs text-muted-foreground">
-              Câmera: {cameras.find((c) => c.id === selectedCamera)?.label || "Padrão"} 
+              Câmera: {cameras.find((camera) => camera.id === selectedCamera)?.label || "Padrão"}
               {cameras.length > 1 && ` (${cameras.length} disponíveis)`}
             </p>
           )}
         </CardContent>
       </Card>
 
-      {/* Scanner area */}
       <Card className="overflow-hidden">
         <CardContent className="p-0">
-          <div className="relative bg-secondary/5 min-h-[300px]">
-            {/* Scanner container - always visible for html5-qrcode */}
+          <div className="relative min-h-[300px] bg-secondary/5">
             <div
               id="qr-reader"
               className={`w-full ${!scanning && !result ? "hidden" : ""}`}
               style={{ minHeight: scanning ? "300px" : "0" }}
             />
 
-            {/* Placeholder when not scanning */}
             {!scanning && !result && (
-              <div className="flex flex-col items-center justify-center min-h-[300px] p-8 text-center">
-                <div className="w-20 h-20 rounded-full bg-primary/10 flex items-center justify-center mb-4">
+              <div className="flex min-h-[300px] flex-col items-center justify-center p-8 text-center">
+                <div className="mb-4 flex h-20 w-20 items-center justify-center rounded-full bg-primary/10">
                   <Camera className="w-10 h-10 text-primary" />
                 </div>
-                <h3 className="font-heading text-lg font-semibold mb-2">
-                  Pronto para escanear
-                </h3>
-                <p className="text-muted-foreground text-sm max-w-xs">
+                <h3 className="mb-2 font-heading text-lg font-semibold">Pronto para escanear</h3>
+                <p className="max-w-xs text-sm text-muted-foreground">
                   Clique em "Iniciar Câmera" para começar a leitura do{" "}
-                  {type === "qrcode" ? "QR Code" : "código de barras"}
-                </p>
-                <p className="text-xs text-muted-foreground mt-2">
-                  A câmera traseira será utilizada automaticamente
+                  {type === "qrcode" ? "QR Code" : "código de barras"}.
                 </p>
               </div>
             )}
 
-            {/* Error message */}
             {error && (
               <div className="absolute inset-0 flex items-center justify-center bg-destructive/5 p-4">
-                <div className="text-center max-w-sm">
-                  <XCircle className="w-12 h-12 text-destructive mx-auto mb-3" />
-                  <p className="text-destructive font-medium mb-2">Erro</p>
-                  <p className="text-sm text-muted-foreground mb-4">{error}</p>
-                  <Button
-                    variant="outline"
-                    onClick={resetScanner}
-                    className="gap-2"
-                  >
+                <div className="max-w-sm text-center">
+                  <XCircle className="mx-auto mb-3 w-12 h-12 text-destructive" />
+                  <p className="mb-2 font-medium text-destructive">Erro</p>
+                  <p className="mb-4 text-sm text-muted-foreground">{error}</p>
+                  <Button variant="outline" onClick={resetScanner} className="gap-2">
                     <RotateCcw className="w-4 h-4" />
                     Tentar novamente
                   </Button>
@@ -461,72 +493,57 @@ export function Scanner({ type = "qrcode", onScanComplete }) {
         </CardContent>
       </Card>
 
-      {/* Result card */}
       {result && (
         <Card className="border-success animate-slide-up">
           <CardHeader className="pb-3">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-full bg-success/10 flex items-center justify-center animate-success-pulse">
+              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-success/10 animate-success-pulse">
                 <CheckCircle2 className="w-6 h-6 text-success" />
               </div>
               <div>
                 <CardTitle className="font-heading text-lg text-success">
-                  Leitura Realizada!
+                  {result.exists ? "Produto encontrado!" : "Produto não cadastrado"}
                 </CardTitle>
                 <p className="text-sm text-muted-foreground">
-                  {getOperationMessage(result.tipo_operacao)}
+                  {result.exists
+                    ? "A leitura foi registrada e o produto pode ser visualizado na tela central."
+                    : getOperationMessage(result.tipo_operacao)}
                 </p>
               </div>
             </div>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              {/* Product */}
-              <div className="flex items-start gap-3 p-3 rounded-lg bg-muted/50">
-                <Package className="w-5 h-5 text-primary mt-0.5" />
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <div className="flex items-start gap-3 rounded-lg bg-muted/50 p-3">
+                <Package className="mt-0.5 w-5 h-5 text-primary" />
                 <div>
-                  <p className="text-xs text-muted-foreground uppercase tracking-wide">
-                    Produto
-                  </p>
+                  <p className="text-xs uppercase tracking-wide text-muted-foreground">Produto</p>
                   <p className="font-medium">{result.produto}</p>
                 </div>
               </div>
-
-              {/* Code */}
-              <div className="flex items-start gap-3 p-3 rounded-lg bg-muted/50">
-                <Hash className="w-5 h-5 text-primary mt-0.5" />
+              <div className="flex items-start gap-3 rounded-lg bg-muted/50 p-3">
+                <Hash className="mt-0.5 w-5 h-5 text-primary" />
                 <div>
-                  <p className="text-xs text-muted-foreground uppercase tracking-wide">
-                    Código
-                  </p>
+                  <p className="text-xs uppercase tracking-wide text-muted-foreground">Código</p>
                   <p className="font-mono font-medium">{result.codigo}</p>
                 </div>
               </div>
-
-              {/* Sector */}
-              <div className="flex items-start gap-3 p-3 rounded-lg bg-muted/50">
-                <MapPin className="w-5 h-5 text-primary mt-0.5" />
+              <div className="flex items-start gap-3 rounded-lg bg-muted/50 p-3">
+                <MapPin className="mt-0.5 w-5 h-5 text-primary" />
                 <div>
-                  <p className="text-xs text-muted-foreground uppercase tracking-wide">
-                    Setor
-                  </p>
+                  <p className="text-xs uppercase tracking-wide text-muted-foreground">Setor</p>
                   <p className="font-medium">{result.setor}</p>
                 </div>
               </div>
-
-              {/* Quantity */}
-              <div className="flex items-start gap-3 p-3 rounded-lg bg-muted/50">
-                <Layers className="w-5 h-5 text-primary mt-0.5" />
+              <div className="flex items-start gap-3 rounded-lg bg-muted/50 p-3">
+                <Layers className="mt-0.5 w-5 h-5 text-primary" />
                 <div>
-                  <p className="text-xs text-muted-foreground uppercase tracking-wide">
-                    Quantidade
-                  </p>
+                  <p className="text-xs uppercase tracking-wide text-muted-foreground">Quantidade</p>
                   <p className="font-medium">{result.quantidade}</p>
                 </div>
               </div>
             </div>
 
-            {/* Operation badge and points */}
             <div className="flex flex-wrap items-center gap-3 pt-2">
               <Badge className={getOperationBadgeClass(result.tipo_operacao)}>
                 {result.tipo_operacao}
@@ -535,24 +552,37 @@ export function Scanner({ type = "qrcode", onScanComplete }) {
                 {type === "qrcode" ? "QR Code" : "Código de Barras"}
               </Badge>
               {activityMode && result.pontuacao && (
-                <Badge className="bg-warning text-warning-foreground gap-1">
+                <Badge className="gap-1 bg-warning text-warning-foreground">
                   <Zap className="w-3 h-3" />
                   +{result.pontuacao} pontos
                 </Badge>
               )}
             </div>
 
-            {/* Actions */}
-            <div className="flex gap-3 pt-2">
-              <Button onClick={resetScanner} className="gap-2 flex-1" data-testid="scan-again-btn">
+            <div className="flex flex-col gap-3 pt-2 sm:flex-row">
+              <Button onClick={resetScanner} className="flex-1 gap-2" data-testid="scan-again-btn">
                 <RotateCcw className="w-4 h-4" />
                 Nova Leitura
               </Button>
-              <Link to="/historico" className="flex-1">
-                <Button variant="outline" className="w-full" data-testid="view-history-btn">
-                  Ver Histórico
+              {result.exists ? (
+                <Button
+                  variant="outline"
+                  className="flex-1"
+                  onClick={() => navigate(`/produtos?codigo=${encodeURIComponent(result.codigo)}`)}
+                  data-testid="view-product-btn"
+                >
+                  Ver na Tela de Produtos
                 </Button>
-              </Link>
+              ) : (
+                <Button
+                  variant="outline"
+                  className="flex-1"
+                  onClick={() => navigate(buildQuickCreateUrl(result))}
+                  data-testid="quick-register-product-btn"
+                >
+                  Cadastro Rápido do Produto
+                </Button>
+              )}
             </div>
           </CardContent>
         </Card>

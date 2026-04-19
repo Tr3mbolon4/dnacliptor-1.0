@@ -1,4 +1,4 @@
-import React, { useState, useRef } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import { Link } from "react-router-dom";
 import { useApp } from "../contexts/AppContext";
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
@@ -30,13 +30,17 @@ import {
 } from "lucide-react";
 
 export default function GeradorQR() {
-  const { materiais } = useApp();
+  const { materiais, fetchMateriais } = useApp();
   const [selectedMaterial, setSelectedMaterial] = useState(null);
   const [customContent, setCustomContent] = useState("");
   const [qrContent, setQrContent] = useState("");
   const [copied, setCopied] = useState(false);
   const [selectedForPrint, setSelectedForPrint] = useState([]);
   const qrRef = useRef(null);
+
+  useEffect(() => {
+    fetchMateriais();
+  }, [fetchMateriais]);
 
   const handleSelectMaterial = (materialId) => {
     const material = materiais.find((m) => m.id === materialId);

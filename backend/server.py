@@ -17,9 +17,26 @@ ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
 
 # MongoDB connection
-mongo_url = os.environ['MONGO_URL']
-client = AsyncIOMotorClient(mongo_url)
-db = client[os.environ['DB_NAME']]
+MONGO_URL = os.getenv("MONGO_URL", "").strip()
+DB_NAME = os.getenv("DB_NAME", "logi3a").strip() or "logi3a"
+USE_MOCK_DB = os.getenv("USE_MOCK_DB", "").strip().lower() in {"1", "true", "yes"} or not MONGO_URL
+
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+logger = logging.getLogger(__name__)
+
+def create_database_client(use_mock: bool):
+    if use_mock:
+        from mongomock_motor import AsyncMongoMockClient
+
+        logger.warning("Usando banco em memória para desenvolvimento local.")
+        mongo_client = AsyncMongoMockClient()
+    else:
+        mongo_client = AsyncIOMotorClient(MONGO_URL, serverSelectionTimeoutMS=5000)
+
+    return mongo_client, mongo_client[DB_NAME]
+
+
+client, db = create_database_client(USE_MOCK_DB)
 
 # Create the main app
 app = FastAPI(title="Logi3A Soluções API")
@@ -29,8 +46,14 @@ api_router = APIRouter(prefix="/api")
 UPLOADS_DIR = ROOT_DIR / "uploads"
 UPLOADS_DIR.mkdir(exist_ok=True)
 
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-logger = logging.getLogger(__name__)
+CORS_ORIGINS = [
+    origin.strip()
+    for origin in os.getenv(
+        "CORS_ORIGINS",
+        "http://localhost:3000,http://127.0.0.1:3000",
+    ).split(",")
+    if origin.strip()
+]
 
 # ============ HELPERS ============
 
@@ -853,10 +876,28 @@ app.include_router(api_router)
 app.add_middleware(
     CORSMiddleware,
     allow_credentials=True,
-    allow_origins=os.environ.get('CORS_ORIGINS', '*').split(','),
+    allow_origins=CORS_ORIGINS,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+@app.on_event("startup")
+async def startup_db_client():
+    global client, db, USE_MOCK_DB
+
+    if USE_MOCK_DB:
+        logger.info("API iniciada com banco em memória (%s).", DB_NAME)
+        return
+
+    try:
+        await client.admin.command("ping")
+        logger.info("Conectado ao MongoDB (%s).", DB_NAME)
+    except Exception as exc:
+        logger.warning("Falha ao conectar ao MongoDB. Fallback para banco em memória. Erro: %s", exc)
+        client.close()
+        USE_MOCK_DB = True
+        client, db = create_database_client(True)
+        logger.info("API iniciada com banco em memória (%s).", DB_NAME)
 
 @app.on_event("shutdown")
 async def shutdown_db_client():

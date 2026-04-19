@@ -34,7 +34,7 @@ export function Header() {
     { path: "/scanner-barcode", icon: QrCode, label: "Código de Barras" },
     { path: "/historico", icon: History, label: "Histórico" },
     { path: "/dashboard", icon: BarChart3, label: "Dashboard" },
-    { path: "/materiais", icon: Package, label: "Materiais" },
+    { path: "/produtos", icon: Package, label: "Produtos" },
     { path: "/gerador-qr", icon: QrCode, label: "Gerador QR" },
     { path: "/gerador-conteudo", icon: FileText, label: "QR Conteúdo" },
     { path: "/atividade", icon: GraduationCap, label: "Atividade" },
