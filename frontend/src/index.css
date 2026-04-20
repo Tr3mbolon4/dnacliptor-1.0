@@ -1,269 +1,73 @@
-@import url('https://fonts.googleapis.com/css2?family=Chivo:wght@400;500;700;900&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Antonio:wght@400;500;700&family=Manrope:wght@400;500;700;800&display=swap');
 
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 @layer base {
-    :root {
-        --background: 210 40% 98%;
-        --foreground: 222 47% 11%;
-        --card: 0 0% 100%;
-        --card-foreground: 222 47% 11%;
-        --popover: 0 0% 100%;
-        --popover-foreground: 222 47% 11%;
-        --primary: 214 100% 40%;
-        --primary-foreground: 0 0% 100%;
-        --secondary: 222 47% 11%;
-        --secondary-foreground: 0 0% 100%;
-        --muted: 210 40% 96%;
-        --muted-foreground: 215 16% 47%;
-        --accent: 217 91% 60%;
-        --accent-foreground: 0 0% 100%;
-        --destructive: 0 84% 60%;
-        --destructive-foreground: 0 0% 100%;
-        --border: 214 32% 91%;
-        --input: 214 32% 91%;
-        --ring: 214 100% 40%;
-        --success: 160 84% 39%;
-        --success-foreground: 0 0% 100%;
-        --warning: 38 92% 50%;
-        --warning-foreground: 0 0% 100%;
-        --info: 217 91% 60%;
-        --info-foreground: 0 0% 100%;
-        --radius: 0.5rem;
-        --chart-1: 214 100% 40%;
-        --chart-2: 160 84% 39%;
-        --chart-3: 38 92% 50%;
-        --chart-4: 280 65% 60%;
-        --chart-5: 340 75% 55%;
-    }
+  :root {
+    --background: 0 0% 2%;
+    --foreground: 0 0% 100%;
+    --card: 24 48% 10%;
+    --card-foreground: 0 0% 100%;
+    --popover: 0 0% 5%;
+    --popover-foreground: 0 0% 100%;
+    --primary: 39 92% 63%;
+    --primary-foreground: 0 0% 4%;
+    --secondary: 35 56% 14%;
+    --secondary-foreground: 0 0% 100%;
+    --muted: 0 0% 10%;
+    --muted-foreground: 0 0% 66%;
+    --accent: 38 89% 48%;
+    --accent-foreground: 0 0% 5%;
+    --destructive: 0 70% 52%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 35 35% 18%;
+    --input: 35 35% 18%;
+    --ring: 39 92% 63%;
+    --radius: 1rem;
+  }
 
-    .dark {
-        --background: 222 47% 11%;
-        --foreground: 210 40% 98%;
-        --card: 222 47% 15%;
-        --card-foreground: 210 40% 98%;
-        --popover: 222 47% 15%;
-        --popover-foreground: 210 40% 98%;
-        --primary: 214 100% 50%;
-        --primary-foreground: 0 0% 100%;
-        --secondary: 215 28% 17%;
-        --secondary-foreground: 210 40% 98%;
-        --muted: 215 28% 17%;
-        --muted-foreground: 215 20% 65%;
-        --accent: 217 91% 60%;
-        --accent-foreground: 0 0% 100%;
-        --destructive: 0 62% 30%;
-        --destructive-foreground: 0 0% 100%;
-        --border: 215 28% 17%;
-        --input: 215 28% 17%;
-        --ring: 214 100% 50%;
-    }
+  * {
+    @apply border-border;
+  }
+
+  html {
+    scroll-behavior: smooth;
+  }
+
+  body {
+    @apply bg-background text-foreground antialiased;
+    font-family: 'Manrope', sans-serif;
+    background:
+      radial-gradient(circle at top, rgba(248, 195, 95, 0.1), transparent 28%),
+      linear-gradient(180deg, #090909 0%, #040404 100%);
+  }
+
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    font-family: 'Antonio', sans-serif;
+    letter-spacing: 0.04em;
+  }
+
+  a {
+    text-decoration: none;
+  }
 }
 
-@layer base {
-    * {
-        @apply border-border;
-    }
-    body {
-        @apply bg-background text-foreground font-sans antialiased;
-        font-family: 'Inter', sans-serif;
-    }
-    h1, h2, h3, h4, h5, h6 {
-        font-family: 'Chivo', sans-serif;
-    }
-    code, pre, .mono {
-        font-family: 'JetBrains Mono', monospace;
-    }
-}
-
-/* Scanner animation */
-@keyframes scan {
-    0%, 100% {
-        transform: translateY(0);
-    }
-    50% {
-        transform: translateY(250px);
-    }
-}
-
-.animate-scan {
-    animation: scan 2s ease-in-out infinite;
-}
-
-/* Success pulse animation */
-@keyframes success-pulse {
-    0%, 100% {
-        box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.4);
-    }
-    50% {
-        box-shadow: 0 0 0 20px rgba(16, 185, 129, 0);
-    }
-}
-
-.animate-success-pulse {
-    animation: success-pulse 1s ease-out;
-}
-
-/* Viewfinder corners */
-.viewfinder-corner {
-    position: absolute;
-    width: 30px;
-    height: 30px;
-    border-color: #0052CC;
-    border-width: 4px;
-}
-
-.viewfinder-corner.top-left {
-    top: 0;
-    left: 0;
-    border-right: none;
-    border-bottom: none;
-}
-
-.viewfinder-corner.top-right {
-    top: 0;
-    right: 0;
-    border-left: none;
-    border-bottom: none;
-}
-
-.viewfinder-corner.bottom-left {
-    bottom: 0;
-    left: 0;
-    border-right: none;
-    border-top: none;
-}
-
-.viewfinder-corner.bottom-right {
-    bottom: 0;
-    right: 0;
-    border-left: none;
-    border-top: none;
-}
-
-/* Print styles */
-@media print {
-    .no-print {
-        display: none !important;
-    }
-    .print-only {
-        display: block !important;
-    }
-    body {
-        background: white !important;
-    }
-}
-
-/* Custom scrollbar */
 ::-webkit-scrollbar {
-    width: 8px;
-    height: 8px;
+  width: 10px;
 }
 
 ::-webkit-scrollbar-track {
-    background: hsl(var(--muted));
-    border-radius: 4px;
+  background: #100d08;
 }
 
 ::-webkit-scrollbar-thumb {
-    background: hsl(var(--primary) / 0.3);
-    border-radius: 4px;
-}
-
-::-webkit-scrollbar-thumb:hover {
-    background: hsl(var(--primary) / 0.5);
-}
-
-/* Card hover effects */
-.card-hover {
-    transition: all 0.2s ease-in-out;
-}
-
-.card-hover:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 10px 25px -5px rgba(0, 82, 204, 0.1);
-}
-
-/* Glass effect */
-.glass {
-    background: rgba(255, 255, 255, 0.8);
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
-}
-
-/* Gradient text (for special cases only) */
-.gradient-text {
-    background: linear-gradient(135deg, #0052CC 0%, #2563EB 100%);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
-}
-
-/* Status indicator */
-.status-dot {
-    width: 8px;
-    height: 8px;
-    border-radius: 50%;
-    animation: pulse 2s infinite;
-}
-
-@keyframes pulse {
-    0%, 100% {
-        opacity: 1;
-    }
-    50% {
-        opacity: 0.5;
-    }
-}
-
-/* Table row hover */
-.table-row-hover:hover {
-    background-color: hsl(var(--primary) / 0.05);
-}
-
-/* Badge variants */
-.badge-recebimento {
-    background-color: #dbeafe;
-    color: #1e40af;
-}
-
-.badge-expedicao {
-    background-color: #dcfce7;
-    color: #166534;
-}
-
-.badge-estoque {
-    background-color: #fef3c7;
-    color: #92400e;
-}
-
-.badge-reversa {
-    background-color: #fce7f3;
-    color: #9d174d;
-}
-
-.badge-identificacao {
-    background-color: #e0e7ff;
-    color: #3730a3;
-}
-
-/* Debug wrapper fix */
-[data-debug-wrapper="true"] {
-    display: contents !important;
-}
-
-[data-debug-wrapper="true"] > * {
-    margin-left: inherit;
-    margin-right: inherit;
-    margin-top: inherit;
-    margin-bottom: inherit;
-    padding-left: inherit;
-    padding-right: inherit;
-    padding-top: inherit;
-    padding-bottom: inherit;
-    column-gap: inherit;
-    row-gap: inherit;
-    gap: inherit;
+  background: linear-gradient(180deg, #f8c35f, #9c6305);
+  border-radius: 999px;
 }
