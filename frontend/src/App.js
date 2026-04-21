@@ -234,6 +234,23 @@ function Input({ label, value, onChange, type = "text", required = false, placeh
   );
 }
 
+function getStoredLatestOrder() {
+  try {
+    return JSON.parse(window.localStorage.getItem("dna-latest-order") || "null");
+  } catch {
+    return null;
+  }
+}
+
+function formatOrderAddress(order) {
+  const address = order?.customer?.address;
+  if (!address) return "Endereco nao informado";
+  const primary = [address.street, address.number].filter(Boolean).join(", ");
+  const secondary = [address.district, address.city, address.state].filter(Boolean).join(" - ");
+  const zip = address.zip_code ? `CEP ${address.zip_code}` : "";
+  return [primary, secondary, zip].filter(Boolean).join(" | ");
+}
+
 function PolicyCard({ title, children }) {
   return (
     <div className="rounded-[24px] border border-white/10 bg-black/25 p-6">
@@ -243,9 +260,21 @@ function PolicyCard({ title, children }) {
   );
 }
 
-function MetricCard({ icon: Icon, label, value }) {
+function MetricCard({ icon: Icon, label, value, onClick = null, active = false }) {
+  const className = `cliptor-card p-5 transition ${onClick ? "cursor-pointer hover:border-[#f4b63e]/40 hover:bg-[#16110a]" : ""} ${active ? "border-[#f4b63e]/50 bg-[#171008]" : ""}`;
+
+  if (onClick) {
+    return (
+      <button type="button" onClick={onClick} className={`${className} text-left`}>
+        <Icon className="text-[#f8c35f]" />
+        <p className="mt-5 text-xs uppercase tracking-[0.24em] text-zinc-500">{label}</p>
+        <p className="mt-2 text-4xl font-black uppercase">{value}</p>
+      </button>
+    );
+  }
+
   return (
-    <div className="cliptor-card p-5">
+    <div className={className}>
       <Icon className="text-[#f8c35f]" />
       <p className="mt-5 text-xs uppercase tracking-[0.24em] text-zinc-500">{label}</p>
       <p className="mt-2 text-4xl font-black uppercase">{value}</p>
@@ -607,7 +636,7 @@ function CheckoutPage({ cart, products, store, onOrderCreated }) {
 
   const pricing = useMemo(() => {
     const subtotal = detailed.reduce((sum, item) => sum + item.quantity * item.product.sale_price, 0);
-    const shipping = Number(store.settings.shipping_by_state?.[form.state] || 39.9);
+    const shipping = Number(store.settings.shipping_by_state?.[form.state] ?? 39.9);
     const insurance = form.include_insurance && store.settings.insurance_enabled ? Number(store.settings.insurance_fee || 0) : 0;
     const discount = form.coupon_code.toUpperCase() === "DNA10" ? subtotal * 0.1 : 0;
     return { subtotal, shipping, insurance, discount, total: subtotal + shipping + insurance - discount };
@@ -860,8 +889,52 @@ function CheckoutPage({ cart, products, store, onOrderCreated }) {
 
 function ConfirmationPage({ latestOrder }) {
   const { id } = useParams();
-  if (!latestOrder || latestOrder.id !== id) {
-    return <div className="mx-auto max-w-4xl px-4 py-20 text-center text-zinc-400">Pedido nao carregado nesta sessao.</div>;
+  const [orderData, setOrderData] = useState(() => {
+    if (latestOrder?.id === id) return latestOrder;
+    const storedOrder = getStoredLatestOrder();
+    return storedOrder?.id === id ? storedOrder : null;
+  });
+  const [loadingOrder, setLoadingOrder] = useState(() => !orderData);
+
+  useEffect(() => {
+    if (latestOrder?.id === id) {
+      setOrderData(latestOrder);
+      setLoadingOrder(false);
+    }
+  }, [id, latestOrder]);
+
+  useEffect(() => {
+    if (orderData?.id === id) return;
+    let cancelled = false;
+
+    const loadOrder = async () => {
+      setLoadingOrder(true);
+      try {
+        const response = await axios.get(`${API_BASE}/api/orders/${id}`);
+        if (cancelled) return;
+        setOrderData(response.data);
+        window.localStorage.setItem("dna-latest-order", JSON.stringify(response.data));
+      } catch {
+        if (cancelled) return;
+        const storedOrder = getStoredLatestOrder();
+        setOrderData(storedOrder?.id === id ? storedOrder : null);
+      } finally {
+        if (!cancelled) setLoadingOrder(false);
+      }
+    };
+
+    loadOrder();
+    return () => {
+      cancelled = true;
+    };
+  }, [id, orderData?.id]);
+
+  if (loadingOrder) {
+    return <div className="mx-auto max-w-4xl px-4 py-20 text-center text-zinc-400">Carregando os dados do pedido...</div>;
+  }
+
+  if (!orderData) {
+    return <div className="mx-auto max-w-4xl px-4 py-20 text-center text-zinc-400">Pedido nao encontrado. Gere um novo pedido ou volte ao carrinho.</div>;
   }
 
   return (
@@ -870,27 +943,31 @@ function ConfirmationPage({ latestOrder }) {
         <div className="cliptor-card p-8">
           <p className="text-sm uppercase tracking-[0.3em] text-[#f8c35f]">Pagamento</p>
           <h1 className="mt-3 text-5xl font-black uppercase">PIX gerado com sucesso</h1>
-          <p className="mt-4 text-zinc-300">Pedido <span className="font-bold text-white">{latestOrder.order_number}</span> pronto para pagamento e envio ao vendedor escolhido.</p>
+          <p className="mt-4 text-zinc-300">Pedido <span className="font-bold text-white">{orderData.order_number}</span> pronto para pagamento e envio ao vendedor escolhido.</p>
           <div className="mt-8 rounded-[24px] border border-white/10 bg-black/35 p-5">
             <p className="text-xs uppercase tracking-[0.24em] text-zinc-500">Codigo PIX</p>
-            <p className="mt-3 break-all font-mono text-sm text-zinc-200">{latestOrder.pix_code}</p>
+            <p className="mt-3 break-all font-mono text-sm text-zinc-200">{orderData.pix_code}</p>
           </div>
           <div className="mt-8 grid gap-4 md:grid-cols-2">
             <div className="rounded-[22px] border border-white/10 bg-black/30 p-5">
               <p className="text-xs uppercase tracking-[0.24em] text-zinc-500">Vendedor</p>
-              <p className="mt-2 text-2xl font-black uppercase">{latestOrder.seller_name}</p>
-              <p className="mt-2 text-sm text-zinc-400">{latestOrder.seller_whatsapp}</p>
+              <p className="mt-2 text-2xl font-black uppercase">{orderData.seller_name}</p>
+              <p className="mt-2 text-sm text-zinc-400">{orderData.seller_whatsapp}</p>
             </div>
             <div className="rounded-[22px] border border-white/10 bg-black/30 p-5">
               <p className="text-xs uppercase tracking-[0.24em] text-zinc-500">Total</p>
-              <p className="mt-2 text-2xl font-black uppercase">{currency(latestOrder.total)}</p>
-              <p className="mt-2 text-sm text-zinc-400">Seguro: {currency(latestOrder.insurance_cost)} | Frete: {currency(latestOrder.shipping_cost)}</p>
+              <p className="mt-2 text-2xl font-black uppercase">{currency(orderData.total)}</p>
+              <p className="mt-2 text-sm text-zinc-400">Seguro: {currency(orderData.insurance_cost)} | Frete: {currency(orderData.shipping_cost)}</p>
             </div>
           </div>
+          <div className="mt-4 rounded-[22px] border border-white/10 bg-black/20 p-5">
+            <p className="text-xs uppercase tracking-[0.24em] text-zinc-500">Entrega</p>
+            <p className="mt-2 text-sm text-zinc-300">{formatOrderAddress(orderData)}</p>
+          </div>
           <div className="mt-8 flex flex-wrap gap-4">
-            <a href={latestOrder.whatsapp_url} target="_blank" rel="noreferrer" className="cliptor-button">Enviar pedido no WhatsApp</a>
-            {latestOrder.ticket_url && (
-              <a href={latestOrder.ticket_url} target="_blank" rel="noreferrer" className="cliptor-button cliptor-button--ghost">
+            <a href={orderData.whatsapp_url} target="_blank" rel="noreferrer" className="cliptor-button">Enviar pedido no WhatsApp</a>
+            {orderData.ticket_url && (
+              <a href={orderData.ticket_url} target="_blank" rel="noreferrer" className="cliptor-button cliptor-button--ghost">
                 Abrir pagamento Mercado Pago
               </a>
             )}
@@ -898,14 +975,14 @@ function ConfirmationPage({ latestOrder }) {
           </div>
         </div>
         <aside className="cliptor-card flex flex-col items-center justify-center p-6 text-center">
-          {latestOrder.pix_qr_base64 ? (
+          {orderData.pix_qr_base64 ? (
             <img
-              src={`data:image/png;base64,${latestOrder.pix_qr_base64}`}
+              src={`data:image/png;base64,${orderData.pix_qr_base64}`}
               alt="QR Code PIX Mercado Pago"
               className="h-[220px] w-[220px] rounded-2xl bg-white p-3"
             />
           ) : (
-            <QRCodeCanvas value={latestOrder.pix_qr_value} size={220} includeMargin bgColor="#ffffff" fgColor="#000000" />
+            <QRCodeCanvas value={orderData.pix_qr_value} size={220} includeMargin bgColor="#ffffff" fgColor="#000000" />
           )}
           <p className="mt-6 text-sm uppercase tracking-[0.18em] text-zinc-400">Escaneie o QR Code PIX</p>
         </aside>
@@ -988,6 +1065,8 @@ function AdminPage({ products, store, refreshData, addLocalProduct, updateLocalS
   });
   const [uploadingProductImage, setUploadingProductImage] = useState(false);
   const [editingProductId, setEditingProductId] = useState(null);
+  const [selectedOrderId, setSelectedOrderId] = useState("");
+  const ordersSectionRef = useRef(null);
 
   const resetProductForm = () => {
     setEditingProductId(null);
@@ -1029,6 +1108,7 @@ function AdminPage({ products, store, refreshData, addLocalProduct, updateLocalS
       ]);
       setDashboard(dashResponse.data);
       setOrders(ordersResponse.data.orders);
+      setSelectedOrderId((current) => current || ordersResponse.data.orders[0]?.id || "");
     } catch (error) {
       if (!error.response) {
         buildOfflineDashboard();
@@ -1042,6 +1122,16 @@ function AdminPage({ products, store, refreshData, addLocalProduct, updateLocalS
   useEffect(() => {
     if (token) loadAdmin();
   }, [token]);
+
+  useEffect(() => {
+    if (!orders.length) {
+      setSelectedOrderId("");
+      return;
+    }
+    if (!orders.some((order) => order.id === selectedOrderId)) {
+      setSelectedOrderId(orders[0].id);
+    }
+  }, [orders, selectedOrderId]);
 
   useEffect(() => {
     setContent({
@@ -1187,6 +1277,14 @@ function AdminPage({ products, store, refreshData, addLocalProduct, updateLocalS
     }
   };
 
+  const selectedOrder = orders.find((order) => order.id === selectedOrderId) || orders[0] || null;
+  const openOrdersPanel = () => {
+    if (!selectedOrderId && orders[0]) {
+      setSelectedOrderId(orders[0].id);
+    }
+    ordersSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  };
+
   const saveContent = async (event) => {
     event.preventDefault();
     const normalizedContent = {
@@ -1251,7 +1349,7 @@ function AdminPage({ products, store, refreshData, addLocalProduct, updateLocalS
       {dashboard && (
         <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-4">
           <MetricCard icon={Package} label="Produtos" value={dashboard.summary.total_products} />
-          <MetricCard icon={ShoppingCart} label="Pedidos" value={dashboard.summary.total_orders} />
+          <MetricCard icon={ShoppingCart} label="Pedidos" value={dashboard.summary.total_orders} onClick={openOrdersPanel} active={Boolean(selectedOrder)} />
           <MetricCard icon={ShieldCheck} label="Pagos" value={dashboard.summary.paid_orders} />
           <MetricCard icon={BarChart3} label="Receita" value={currency(dashboard.summary.revenue)} />
         </div>
@@ -1435,31 +1533,83 @@ function AdminPage({ products, store, refreshData, addLocalProduct, updateLocalS
           </div>
         </div>
 
-        <div className="cliptor-card p-6">
+        <div ref={ordersSectionRef} className="cliptor-card p-6">
           <h2 className="text-3xl font-black uppercase">Pedidos</h2>
-          <div className="mt-6 space-y-4">
-            {orders.length === 0 && <p className="text-zinc-400">Nenhum pedido ainda.</p>}
-            {orders.map((order) => (
-              <div key={order.id} className="rounded-[22px] border border-white/10 bg-black/25 p-4">
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                  <div>
-                    <p className="font-black uppercase">{order.order_number}</p>
-                    <p className="text-sm text-zinc-400">{order.customer.full_name} | {order.seller_name}</p>
+          <p className="mt-2 text-sm text-zinc-400">Clique em um pedido para ver numero, cliente, endereco completo e status de pagamento.</p>
+          <div className="mt-6 grid gap-6 xl:grid-cols-[0.95fr_1.05fr]">
+            <div className="space-y-3">
+              {orders.length === 0 && <p className="text-zinc-400">Nenhum pedido ainda.</p>}
+              {orders.map((order) => (
+                <button
+                  key={order.id}
+                  type="button"
+                  onClick={() => setSelectedOrderId(order.id)}
+                  className={`w-full rounded-[22px] border p-4 text-left transition ${selectedOrder?.id === order.id ? "border-[#f4b63e]/50 bg-[#171008]" : "border-white/10 bg-black/25 hover:border-[#f4b63e]/30"}`}
+                >
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div>
+                      <p className="font-black uppercase">{order.order_number}</p>
+                      <p className="text-sm text-zinc-400">{order.customer.full_name}</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="font-black text-[#f8c35f]">{currency(order.total)}</p>
+                      <p className="text-xs uppercase tracking-[0.18em] text-zinc-500">{order.payment_status || order.status}</p>
+                    </div>
                   </div>
-                  <div className="text-right">
-                    <p className="font-black text-[#f8c35f]">{currency(order.total)}</p>
-                    <p className="text-xs uppercase tracking-[0.18em] text-zinc-500">{order.status}</p>
+                  <p className="mt-3 text-xs uppercase tracking-[0.18em] text-zinc-500">{order.status}</p>
+                </button>
+              ))}
+            </div>
+            {selectedOrder && (
+              <div className="rounded-[22px] border border-white/10 bg-black/25 p-5">
+                <div className="flex flex-wrap items-start justify-between gap-4">
+                  <div>
+                    <p className="text-xs uppercase tracking-[0.18em] text-zinc-500">Pedido</p>
+                    <h3 className="mt-2 text-2xl font-black uppercase">{selectedOrder.order_number}</h3>
+                    <p className="mt-2 text-sm text-zinc-400">{selectedOrder.customer.full_name} | {selectedOrder.seller_name}</p>
+                  </div>
+                  <div className="rounded-full border border-[#f4b63e]/30 px-4 py-2 text-xs font-bold uppercase tracking-[0.18em] text-[#f8c35f]">
+                    {selectedOrder.payment_status || selectedOrder.status}
                   </div>
                 </div>
-                <div className="mt-4 flex flex-wrap gap-2">
+                <div className="mt-5 grid gap-4 md:grid-cols-2">
+                  <div className="rounded-[18px] border border-white/10 bg-black/25 p-4">
+                    <p className="text-xs uppercase tracking-[0.18em] text-zinc-500">Cliente</p>
+                    <p className="mt-2 font-bold text-white">{selectedOrder.customer.full_name}</p>
+                    <p className="mt-2 text-sm text-zinc-400">{selectedOrder.customer.phone}</p>
+                    <p className="mt-1 text-sm text-zinc-400">{selectedOrder.customer.whatsapp}</p>
+                  </div>
+                  <div className="rounded-[18px] border border-white/10 bg-black/25 p-4">
+                    <p className="text-xs uppercase tracking-[0.18em] text-zinc-500">Endereco</p>
+                    <p className="mt-2 text-sm text-zinc-300">{formatOrderAddress(selectedOrder)}</p>
+                    {selectedOrder.customer?.address?.reference && (
+                      <p className="mt-2 text-sm text-zinc-400">Referencia: {selectedOrder.customer.address.reference}</p>
+                    )}
+                  </div>
+                </div>
+                <div className="mt-5 grid gap-4 md:grid-cols-3">
+                  <div className="rounded-[18px] border border-white/10 bg-black/25 p-4">
+                    <p className="text-xs uppercase tracking-[0.18em] text-zinc-500">Status do pedido</p>
+                    <p className="mt-2 font-black uppercase text-white">{selectedOrder.status}</p>
+                  </div>
+                  <div className="rounded-[18px] border border-white/10 bg-black/25 p-4">
+                    <p className="text-xs uppercase tracking-[0.18em] text-zinc-500">Pagamento</p>
+                    <p className="mt-2 font-black uppercase text-white">{selectedOrder.payment_status || "Aguardando"}</p>
+                  </div>
+                  <div className="rounded-[18px] border border-white/10 bg-black/25 p-4">
+                    <p className="text-xs uppercase tracking-[0.18em] text-zinc-500">Total</p>
+                    <p className="mt-2 font-black uppercase text-[#f8c35f]">{currency(selectedOrder.total)}</p>
+                  </div>
+                </div>
+                <div className="mt-5 flex flex-wrap gap-2">
                   {["Pedido recebido", "Pago", "Separacao", "Enviado", "Entregue", "Cancelado"].map((status) => (
-                    <button key={status} className="rounded-full border border-white/10 px-3 py-2 text-xs font-bold uppercase tracking-[0.18em] text-zinc-300 hover:border-[#f4b63e]/40" onClick={() => updateStatus(order.id, status)} type="button">
+                    <button key={status} className="rounded-full border border-white/10 px-3 py-2 text-xs font-bold uppercase tracking-[0.18em] text-zinc-300 hover:border-[#f4b63e]/40" onClick={() => updateStatus(selectedOrder.id, status)} type="button">
                       {status}
                     </button>
                   ))}
                 </div>
               </div>
-            ))}
+            )}
           </div>
         </div>
       </div>

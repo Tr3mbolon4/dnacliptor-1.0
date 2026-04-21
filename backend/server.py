@@ -957,16 +957,38 @@ async def mercado_pago_webhook_get(type: Optional[str] = None, topic: Optional[s
 @api_router.get("/cep/{zip_code}")
 async def lookup_zip_code(zip_code: str):
     clean = "".join(char for char in zip_code if char.isdigit())
+    if len(clean) != 8:
+        raise HTTPException(status_code=400, detail="CEP invalido")
+
     samples = {
         "01310930": {"street": "Avenida Paulista", "district": "Bela Vista", "city": "Sao Paulo", "state": "SP"},
         "20040020": {"street": "Rua da Quitanda", "district": "Centro", "city": "Rio de Janeiro", "state": "RJ"},
         "30140071": {"street": "Avenida Afonso Pena", "district": "Centro", "city": "Belo Horizonte", "state": "MG"},
         "70040910": {"street": "SCS Quadra 1", "district": "Asa Sul", "city": "Brasilia", "state": "DF"},
     }
-    data = samples.get(clean)
-    if not data:
-        data = {"street": "Rua de Alta Performance", "district": "Centro", "city": "Sao Paulo", "state": "SP"}
-    return {"zip_code": clean, **data}
+
+    try:
+        response = requests.get(f"https://viacep.com.br/ws/{clean}/json/", timeout=8)
+        response.raise_for_status()
+        payload = response.json()
+        if payload.get("erro"):
+            raise HTTPException(status_code=404, detail="CEP nao encontrado")
+        return {
+            "zip_code": clean,
+            "street": payload.get("logradouro", ""),
+            "district": payload.get("bairro", ""),
+            "city": payload.get("localidade", ""),
+            "state": payload.get("uf", ""),
+        }
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.warning("Falha ao consultar ViaCEP para %s: %s", clean, exc)
+
+    sample = samples.get(clean)
+    if sample:
+        return {"zip_code": clean, **sample}
+    raise HTTPException(status_code=404, detail="CEP nao encontrado")
 
 
 @api_router.post("/upload-image")
