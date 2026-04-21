@@ -855,6 +855,7 @@ async def create_order(payload: OrderCreate):
         order["ticket_url"] = mp_payment.get("ticket_url", "")
 
     await db.orders.insert_one(order)
+    order.pop("_id", None)
 
     for item in order_items:
         await db.products.update_one(
