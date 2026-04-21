@@ -207,10 +207,6 @@ def build_whatsapp_message(order: dict) -> str:
         f"- {item['name']} x{item['quantity']} | R$ {item['total_price']:.2f}"
         for item in order["items"]
     )
-
-
-def normalize_whatsapp_number(value: str) -> str:
-    return "".join(char for char in str(value or "") if char.isdigit())
     address = order["customer"]["address"]
     return (
         f"Pedido {order['order_number']}\n"
@@ -227,6 +223,10 @@ def normalize_whatsapp_number(value: str) -> str:
         f"Total: R$ {order['total']:.2f}\n"
         f"Vendedor: {order['seller_name']}"
     )
+
+
+def normalize_whatsapp_number(value: str) -> str:
+    return "".join(char for char in str(value or "") if char.isdigit())
 
 
 class BrandSection(BaseModel):
