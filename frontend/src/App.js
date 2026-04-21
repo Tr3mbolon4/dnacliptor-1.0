@@ -8,6 +8,35 @@ import { Toaster, toast } from "sonner";
 import "./App.css";
 
 const API_BASE = process.env.REACT_APP_BACKEND_URL || "http://localhost:8000";
+const defaultShippingByState = {
+  SP: 45.0,
+  RJ: 58.0,
+  MG: 58.0,
+  SC: 58.0,
+  RS: 58.0,
+  PR: 58.0,
+  ES: 58.0,
+  DF: 65.0,
+  GO: 65.0,
+  CE: 70.0,
+  BA: 70.0,
+  AL: 70.0,
+  MA: 70.0,
+  MT: 75.0,
+  PE: 75.0,
+  PB: 75.0,
+  PI: 75.0,
+  PA: 80.0,
+  TO: 80.0,
+  MS: 90.0,
+  SE: 100.0,
+  RN: 100.0,
+  RO: 100.0,
+  AP: 100.0,
+  AM: 120.0,
+  AC: 120.0,
+  RR: 120.0,
+};
 
 const fallbackStore = {
   settings: {
@@ -42,11 +71,7 @@ const fallbackStore = {
       "Trocas e reclamacoes so serao aceitas com video. O cliente deve gravar abrindo a caixa no momento da entrega. Sem video, nao sera aceito.",
     insurance_enabled: true,
     insurance_label: "Seguro 100% opcional",
-    shipping_by_state: {
-      AC: 49.9, AL: 39.9, AP: 52.9, AM: 54.9, BA: 39.9, CE: 41.9, DF: 26.9, ES: 31.9, GO: 28.9,
-      MA: 44.9, MT: 37.9, MS: 35.9, MG: 27.9, PA: 47.9, PB: 42.9, PR: 31.9, PE: 41.9, PI: 43.9,
-      RJ: 29.9, RN: 42.9, RS: 36.9, RO: 48.9, RR: 56.9, SC: 33.9, SP: 24.9, SE: 40.9, TO: 38.9,
-    },
+    shipping_by_state: defaultShippingByState,
     insurance_fee: 19.9,
     footer_text: "DNA Cliptor | Forca, foco e evolucao em cada entrega.",
   },
@@ -121,6 +146,132 @@ const fallbackProducts = [
     active: true,
     reviews_count: 89,
   },
+  {
+    id: "world-france",
+    name: "World Series France Whey 900g",
+    slug: "world-series-france-whey-900g",
+    category: "Proteina",
+    description: "Blend proteico da linha World Series com perfil para recuperacao e reconstrucao muscular intensa.",
+    hero_phrase: "Forca extrema com assinatura internacional.",
+    image: "/dna-assets/world-france.jpeg",
+    sale_price: 129,
+    stock: 28,
+    featured: false,
+    tags: ["world series", "proteina", "franca"],
+    rating: 4.8,
+    shipping_by_state: defaultShippingByState,
+    insurance_value: 15.9,
+    brand: "DNA Cliptor",
+    model: "World Series France",
+    manufacturer: "DNA Cliptor Labs",
+    active: true,
+    reviews_count: 0,
+  },
+  {
+    id: "world-russia",
+    name: "World Series Russia Pre-Workout 300g",
+    slug: "world-series-russia-pre-workout-300g",
+    category: "Pre-treino",
+    description: "Formula concentrada para energia, foco e explosao nas sessoes mais pesadas.",
+    hero_phrase: "Energia maxima para treinos sem recuo.",
+    image: "/dna-assets/world-russia.jpeg",
+    sale_price: 119,
+    stock: 24,
+    featured: false,
+    tags: ["world series", "energia", "russia"],
+    rating: 4.8,
+    shipping_by_state: defaultShippingByState,
+    insurance_value: 14.9,
+    brand: "DNA Cliptor",
+    model: "World Series Russia",
+    manufacturer: "DNA Cliptor Labs",
+    active: true,
+    reviews_count: 0,
+  },
+  {
+    id: "world-canada",
+    name: "World Series Canada Creatina 300g",
+    slug: "world-series-canada-creatina-300g",
+    category: "Performance",
+    description: "Creatina micronizada da linha World Series para suporte de forca, volume e repeticao com consistencia.",
+    hero_phrase: "Base diaria para evolucao com nivel de atleta.",
+    image: "/dna-assets/world-canada.jpeg",
+    sale_price: 89.9,
+    stock: 30,
+    featured: false,
+    tags: ["world series", "creatina", "canada"],
+    rating: 4.8,
+    shipping_by_state: defaultShippingByState,
+    insurance_value: 13.9,
+    brand: "DNA Cliptor",
+    model: "World Series Canada",
+    manufacturer: "DNA Cliptor Labs",
+    active: true,
+    reviews_count: 0,
+  },
+  {
+    id: "world-china",
+    name: "World Series China Mass 1,5kg",
+    slug: "world-series-china-mass-1-5kg",
+    category: "Hipercalorico",
+    description: "Combinacao de carboidratos e proteinas para aumentar aporte calorico e acelerar a construcao de massa.",
+    hero_phrase: "Volume bruto para fases de ganho pesado.",
+    image: "/dna-assets/world-china.jpeg",
+    sale_price: 139.9,
+    stock: 18,
+    featured: false,
+    tags: ["world series", "massa", "china"],
+    rating: 4.8,
+    shipping_by_state: defaultShippingByState,
+    insurance_value: 16.9,
+    brand: "DNA Cliptor",
+    model: "World Series China",
+    manufacturer: "DNA Cliptor Labs",
+    active: true,
+    reviews_count: 0,
+  },
+  {
+    id: "world-usa",
+    name: "World Series USA Booster 120 caps",
+    slug: "world-series-usa-booster-120-caps",
+    category: "Hormonal Support",
+    description: "Stack de suporte para energia, drive e desempenho continuo na rotina de alta performance.",
+    hero_phrase: "Atitude de campeao em cada ciclo.",
+    image: "/dna-assets/world-usa.jpeg",
+    sale_price: 119.9,
+    stock: 22,
+    featured: false,
+    tags: ["world series", "booster", "usa"],
+    rating: 4.8,
+    shipping_by_state: defaultShippingByState,
+    insurance_value: 14.9,
+    brand: "DNA Cliptor",
+    model: "World Series USA",
+    manufacturer: "DNA Cliptor Labs",
+    active: true,
+    reviews_count: 0,
+  },
+  {
+    id: "world-brazil",
+    name: "World Series Brazil Recovery 450g",
+    slug: "world-series-brazil-recovery-450g",
+    category: "Recuperacao",
+    description: "Formula para reposicao e recuperacao com aminoacidos e suporte ao desempenho entre treinos.",
+    hero_phrase: "Recupere forte e volte mais agressivo.",
+    image: "/dna-assets/world-brazil.jpeg",
+    sale_price: 104.9,
+    stock: 26,
+    featured: false,
+    tags: ["world series", "recuperacao", "brasil"],
+    rating: 4.8,
+    shipping_by_state: defaultShippingByState,
+    insurance_value: 13.9,
+    brand: "DNA Cliptor",
+    model: "World Series Brazil",
+    manufacturer: "DNA Cliptor Labs",
+    active: true,
+    reviews_count: 0,
+  },
 ];
 
 const navItems = [
@@ -129,7 +280,6 @@ const navItems = [
   { label: "Carrinho", to: "/carrinho" },
   { label: "Politicas", to: "/politicas" },
   { label: "Contato", to: "/contato" },
-  { label: "Painel Admin", to: "/admin" },
 ];
 
 const benefitIcons = [ShieldCheck, Zap, Truck, Crown];
@@ -173,6 +323,19 @@ function getStoredOfflineProducts() {
 
 function setStoredOfflineProducts(products) {
   window.localStorage.setItem("dna-offline-products", JSON.stringify(products));
+}
+
+function getAdminToken() {
+  return window.localStorage.getItem("dna-admin-token") || "";
+}
+
+function getAdminHeaders() {
+  const token = getAdminToken();
+  return token ? { Authorization: `Bearer ${token}` } : {};
+}
+
+function clearAdminSession() {
+  window.localStorage.removeItem("dna-admin-token");
 }
 
 function mergeProducts(primaryProducts, secondaryProducts) {
@@ -225,11 +388,11 @@ function usePersistentCart() {
   return [cart, setCart];
 }
 
-function Input({ label, value, onChange, type = "text", required = false, placeholder = "" }) {
+function Input({ label, value, onChange, type = "text", required = false, placeholder = "", autoComplete = "off" }) {
   return (
     <div>
       <label className="cliptor-label">{label}</label>
-      <input type={type} value={value} required={required} placeholder={placeholder} onChange={(e) => onChange(e.target.value)} className="cliptor-input w-full" />
+      <input type={type} value={value} required={required} placeholder={placeholder} autoComplete={autoComplete} onChange={(e) => onChange(e.target.value)} className="cliptor-input w-full" />
     </div>
   );
 }
@@ -377,7 +540,6 @@ function HomePage({ store, products, onAdd }) {
             </p>
             <div className="mt-8 flex flex-wrap gap-4">
               <Link to="/produtos" className="cliptor-button">{store.settings.hero.cta_text}</Link>
-              <Link to="/admin" className="cliptor-button cliptor-button--ghost">Ver painel admin</Link>
             </div>
             <div className="mt-10 grid gap-4 md:grid-cols-2">
               {store.settings.phrases.map((phrase) => (
@@ -997,7 +1159,7 @@ function PoliciesPage({ store }) {
       <div className="cliptor-card p-8">
         <h1 className="text-5xl font-black uppercase">Politicas</h1>
         <div className="mt-10 grid gap-6">
-          <PolicyCard title="Frete">Valores fixos por estado, configurados no painel administrativo por produto.</PolicyCard>
+          <PolicyCard title="Frete">Valores fixos por estado, configurados no painel administrativo da loja.</PolicyCard>
           <PolicyCard title="Seguro">Opcional. Cobre 100% do pedido quando ativado pelo cliente no checkout.</PolicyCard>
           <PolicyCard title="Trocas e reclamacoes">{store.settings.exchange_policy}</PolicyCard>
           <PolicyCard title="Entrega">{store.settings.mandatory_notice}</PolicyCard>
@@ -1034,7 +1196,7 @@ function ContactPage({ store }) {
 
 function AdminPage({ products, store, refreshData, addLocalProduct, updateLocalStore }) {
   const [token, setToken] = useState(() => window.localStorage.getItem("dna-admin-token") || "");
-  const [credentials, setCredentials] = useState({ email: "admin@dnacliptor.com", password: "admin123" });
+  const [credentials, setCredentials] = useState({ email: "", password: "" });
   const [dashboard, setDashboard] = useState(null);
   const [orders, setOrders] = useState([]);
   const defaultProductImage = store.settings.logo || "/dna-assets/logo.jpeg";
@@ -1103,13 +1265,19 @@ function AdminPage({ products, store, refreshData, addLocalProduct, updateLocalS
   const loadAdmin = async () => {
     try {
       const [dashResponse, ordersResponse] = await Promise.all([
-        axios.get(`${API_BASE}/api/admin/dashboard`),
-        axios.get(`${API_BASE}/api/orders`),
+        axios.get(`${API_BASE}/api/admin/dashboard`, { headers: getAdminHeaders() }),
+        axios.get(`${API_BASE}/api/orders`, { headers: getAdminHeaders() }),
       ]);
       setDashboard(dashResponse.data);
       setOrders(ordersResponse.data.orders);
       setSelectedOrderId((current) => current || ordersResponse.data.orders[0]?.id || "");
     } catch (error) {
+      if (error.response?.status === 401) {
+        clearAdminSession();
+        setToken("");
+        toast.error("Sessao administrativa expirada. Faca login novamente.");
+        return;
+      }
       if (!error.response) {
         buildOfflineDashboard();
         toast.warning("Painel em modo offline. Inicie o backend para dados reais.");
@@ -1155,6 +1323,7 @@ function AdminPage({ products, store, refreshData, addLocalProduct, updateLocalS
 
   const startEditProduct = (product) => {
     setEditingProductId(product.id);
+    setActiveAdminSection("products");
     setProductForm({
       name: product.name || "",
       brand: product.brand || "DNA Cliptor",
@@ -1181,12 +1350,8 @@ function AdminPage({ products, store, refreshData, addLocalProduct, updateLocalS
       setToken(response.data.token);
       toast.success("Login administrativo realizado.");
     } catch (error) {
-      if (!error.response && credentials.email === "admin@dnacliptor.com" && credentials.password === "admin123") {
-        const offlineToken = "dna-admin-offline";
-        window.localStorage.setItem("dna-admin-token", offlineToken);
-        setToken(offlineToken);
-        buildOfflineDashboard();
-        toast.success("Login demo realizado em modo offline.");
+      if (error.response?.status === 429) {
+        toast.error(error.response?.data?.detail || "Muitas tentativas. Tente novamente mais tarde.");
         return;
       }
       if (!error.response) {
@@ -1206,7 +1371,7 @@ function AdminPage({ products, store, refreshData, addLocalProduct, updateLocalS
       sale_price: Number(productForm.sale_price),
       stock: Number(productForm.stock),
       tags: ["novo", "dna cliptor"],
-      shipping_by_state: { SP: 24.9, RJ: 29.9, MG: 27.9, BA: 39.9 },
+      shipping_by_state: defaultShippingByState,
       insurance_value: 19.9,
       active: true,
       rating: 5,
@@ -1214,19 +1379,25 @@ function AdminPage({ products, store, refreshData, addLocalProduct, updateLocalS
     };
     try {
       if (editingProductId && !String(editingProductId).startsWith("local-")) {
-        await axios.put(`${API_BASE}/api/products/${editingProductId}`, payload);
+        await axios.put(`${API_BASE}/api/products/${editingProductId}`, payload, { headers: getAdminHeaders() });
         toast.success("Produto atualizado.");
       } else if (editingProductId) {
         addLocalProduct({ ...payload, id: editingProductId }, true);
         toast.success("Produto local atualizado.");
       } else {
-        await axios.post(`${API_BASE}/api/products`, payload);
+        await axios.post(`${API_BASE}/api/products`, payload, { headers: getAdminHeaders() });
         toast.success("Produto cadastrado.");
       }
       resetProductForm();
       refreshData();
       loadAdmin();
     } catch (error) {
+      if (error.response?.status === 401) {
+        clearAdminSession();
+        setToken("");
+        toast.error("Sessao administrativa expirada. Faca login novamente.");
+        return;
+      }
       if (!error.response) {
         addLocalProduct(editingProductId ? { ...payload, id: editingProductId } : payload, Boolean(editingProductId));
         resetProductForm();
@@ -1245,11 +1416,17 @@ function AdminPage({ products, store, refreshData, addLocalProduct, updateLocalS
     setUploadingProductImage(true);
     try {
       const response = await axios.post(`${API_BASE}/api/upload-image`, formData, {
-        headers: { "Content-Type": "multipart/form-data" },
+        headers: { "Content-Type": "multipart/form-data", ...getAdminHeaders() },
       });
       setProductForm((current) => ({ ...current, image: `${API_BASE}${response.data.url}` }));
       toast.success("Imagem do produto enviada.");
     } catch (error) {
+      if (error.response?.status === 401) {
+        clearAdminSession();
+        setToken("");
+        toast.error("Sessao administrativa expirada. Faca login novamente.");
+        return;
+      }
       try {
         const localPreview = await fileToDataUrl(file);
         setProductForm((current) => ({ ...current, image: localPreview }));
@@ -1269,10 +1446,16 @@ function AdminPage({ products, store, refreshData, addLocalProduct, updateLocalS
 
   const updateStatus = async (orderId, status) => {
     try {
-      await axios.patch(`${API_BASE}/api/orders/${orderId}/status`, { status });
+      await axios.patch(`${API_BASE}/api/orders/${orderId}/status`, { status }, { headers: getAdminHeaders() });
       toast.success("Status atualizado.");
       loadAdmin();
-    } catch {
+    } catch (error) {
+      if (error.response?.status === 401) {
+        clearAdminSession();
+        setToken("");
+        toast.error("Sessao administrativa expirada. Faca login novamente.");
+        return;
+      }
       toast.error("Falha ao atualizar status.");
     }
   };
@@ -1299,10 +1482,16 @@ function AdminPage({ products, store, refreshData, addLocalProduct, updateLocalS
       ),
     };
     try {
-      await axios.put(`${API_BASE}/api/settings`, normalizedContent);
+      await axios.put(`${API_BASE}/api/settings`, normalizedContent, { headers: getAdminHeaders() });
       toast.success("Conteudo do site atualizado.");
       refreshData();
     } catch (error) {
+      if (error.response?.status === 401) {
+        clearAdminSession();
+        setToken("");
+        toast.error("Sessao administrativa expirada. Faca login novamente.");
+        return;
+      }
       if (!error.response) {
         updateLocalStore(normalizedContent);
         toast.success("Configuracoes salvas em modo offline.");
@@ -1319,8 +1508,8 @@ function AdminPage({ products, store, refreshData, addLocalProduct, updateLocalS
           <p className="text-sm uppercase tracking-[0.3em] text-[#f8c35f]">Painel admin</p>
           <h1 className="mt-3 text-5xl font-black uppercase">Login</h1>
           <div className="mt-8 space-y-4">
-            <Input label="E-mail" value={credentials.email} onChange={(value) => setCredentials((current) => ({ ...current, email: value }))} />
-            <Input label="Senha" type="password" value={credentials.password} onChange={(value) => setCredentials((current) => ({ ...current, password: value }))} />
+            <Input label="E-mail" value={credentials.email} onChange={(value) => setCredentials((current) => ({ ...current, email: value }))} autoComplete="off" />
+            <Input label="Senha" type="password" value={credentials.password} onChange={(value) => setCredentials((current) => ({ ...current, password: value }))} autoComplete="new-password" />
           </div>
           <button className="cliptor-button mt-8 w-full">Entrar no painel</button>
         </form>
@@ -1338,7 +1527,7 @@ function AdminPage({ products, store, refreshData, addLocalProduct, updateLocalS
         <button
           className="cliptor-button cliptor-button--ghost"
           onClick={() => {
-            window.localStorage.removeItem("dna-admin-token");
+            clearAdminSession();
             setToken("");
           }}
         >
