@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import axios from "axios";
 import { BrowserRouter, Link, Route, Routes, useLocation, useNavigate, useParams } from "react-router-dom";
 import { QRCodeCanvas } from "qrcode.react";
@@ -1066,7 +1066,7 @@ function AdminPage({ products, store, refreshData, addLocalProduct, updateLocalS
   const [uploadingProductImage, setUploadingProductImage] = useState(false);
   const [editingProductId, setEditingProductId] = useState(null);
   const [selectedOrderId, setSelectedOrderId] = useState("");
-  const ordersSectionRef = useRef(null);
+  const [activeAdminSection, setActiveAdminSection] = useState("orders");
 
   const resetProductForm = () => {
     setEditingProductId(null);
@@ -1279,10 +1279,10 @@ function AdminPage({ products, store, refreshData, addLocalProduct, updateLocalS
 
   const selectedOrder = orders.find((order) => order.id === selectedOrderId) || orders[0] || null;
   const openOrdersPanel = () => {
+    setActiveAdminSection("orders");
     if (!selectedOrderId && orders[0]) {
       setSelectedOrderId(orders[0].id);
     }
-    ordersSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
   };
 
   const saveContent = async (event) => {
@@ -1348,70 +1348,111 @@ function AdminPage({ products, store, refreshData, addLocalProduct, updateLocalS
 
       {dashboard && (
         <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-4">
-          <MetricCard icon={Package} label="Produtos" value={dashboard.summary.total_products} />
+          <MetricCard icon={Package} label="Produtos" value={dashboard.summary.total_products} onClick={() => setActiveAdminSection("products")} active={activeAdminSection === "products"} />
           <MetricCard icon={ShoppingCart} label="Pedidos" value={dashboard.summary.total_orders} onClick={openOrdersPanel} active={Boolean(selectedOrder)} />
-          <MetricCard icon={ShieldCheck} label="Pagos" value={dashboard.summary.paid_orders} />
+          <MetricCard icon={ShieldCheck} label="Pagos" value={dashboard.summary.paid_orders} onClick={() => setActiveAdminSection("orders")} active={activeAdminSection === "orders"} />
           <MetricCard icon={BarChart3} label="Receita" value={currency(dashboard.summary.revenue)} />
         </div>
       )}
 
-      <div className="mt-10 grid gap-8 xl:grid-cols-[1fr_1fr]">
-        <form onSubmit={createProduct} className="cliptor-card p-6">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <h2 className="text-3xl font-black uppercase">{editingProductId ? "Editar produto" : "Cadastro de produtos"}</h2>
-            {editingProductId && (
-              <button type="button" className="cliptor-button cliptor-button--ghost" onClick={resetProductForm}>
-                Cancelar edicao
-              </button>
-            )}
-          </div>
-          <div className="mt-6 grid gap-4 md:grid-cols-[180px_1fr] md:items-start">
-            <div className="rounded-[22px] border border-white/10 bg-black/25 p-3">
-              <img
-                src={productForm.image || defaultProductImage}
-                alt="Preview do produto"
-                className="h-40 w-full rounded-[18px] object-cover"
-              />
-              <p className="mt-3 text-xs uppercase tracking-[0.18em] text-zinc-500">Imagem atual</p>
-              <p className="mt-1 text-xs text-zinc-400">Se nao enviar foto, o produto usa a logo da marca.</p>
-            </div>
-            <div className="rounded-[22px] border border-[#f4b63e]/20 bg-[#130f0a] p-4">
-              <label className="cliptor-label">Foto do produto</label>
-              <input type="file" accept="image/*" onChange={uploadProductImage} className="cliptor-input w-full file:mr-4 file:rounded-full file:border-0 file:bg-[#f8c35f] file:px-4 file:py-2 file:font-bold file:text-black" />
-              <div className="mt-3 flex flex-wrap gap-3">
-                <button type="button" className="cliptor-button cliptor-button--ghost" onClick={() => setProductForm((current) => ({ ...current, image: defaultProductImage }))}>
-                  Usar logo padrao
+      <div className="mt-10 flex flex-wrap gap-3">
+        {[
+          { id: "orders", label: "Pedidos" },
+          { id: "products", label: "Produtos" },
+          { id: "content", label: "Conteudo do site" },
+        ].map((section) => (
+          <button
+            key={section.id}
+            type="button"
+            onClick={() => setActiveAdminSection(section.id)}
+            className={`rounded-full border px-5 py-3 text-sm font-bold uppercase tracking-[0.18em] transition ${activeAdminSection === section.id ? "border-[#f4b63e]/50 bg-[#f4b63e] text-black" : "border-white/10 bg-black/20 text-zinc-300 hover:border-[#f4b63e]/40"}`}
+          >
+            {section.label}
+          </button>
+        ))}
+      </div>
+
+      {activeAdminSection === "products" && (
+        <div className="mt-10 grid gap-8 xl:grid-cols-[1fr_0.95fr]">
+          <form onSubmit={createProduct} className="cliptor-card p-6">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <h2 className="text-3xl font-black uppercase">{editingProductId ? "Editar produto" : "Cadastro de produtos"}</h2>
+              {editingProductId && (
+                <button type="button" className="cliptor-button cliptor-button--ghost" onClick={resetProductForm}>
+                  Cancelar edicao
                 </button>
-                <span className="self-center text-xs uppercase tracking-[0.18em] text-zinc-500">
-                  {uploadingProductImage ? "Enviando imagem..." : "Voce pode trocar a foto quando quiser."}
-                </span>
+              )}
+            </div>
+            <div className="mt-6 grid gap-4 md:grid-cols-[180px_1fr] md:items-start">
+              <div className="rounded-[22px] border border-white/10 bg-black/25 p-3">
+                <img
+                  src={productForm.image || defaultProductImage}
+                  alt="Preview do produto"
+                  className="h-40 w-full rounded-[18px] object-cover"
+                />
+                <p className="mt-3 text-xs uppercase tracking-[0.18em] text-zinc-500">Imagem atual</p>
+                <p className="mt-1 text-xs text-zinc-400">Se nao enviar foto, o produto usa a logo da marca.</p>
+              </div>
+              <div className="rounded-[22px] border border-[#f4b63e]/20 bg-[#130f0a] p-4">
+                <label className="cliptor-label">Foto do produto</label>
+                <input type="file" accept="image/*" onChange={uploadProductImage} className="cliptor-input w-full file:mr-4 file:rounded-full file:border-0 file:bg-[#f8c35f] file:px-4 file:py-2 file:font-bold file:text-black" />
+                <div className="mt-3 flex flex-wrap gap-3">
+                  <button type="button" className="cliptor-button cliptor-button--ghost" onClick={() => setProductForm((current) => ({ ...current, image: defaultProductImage }))}>
+                    Usar logo padrao
+                  </button>
+                  <span className="self-center text-xs uppercase tracking-[0.18em] text-zinc-500">
+                    {uploadingProductImage ? "Enviando imagem..." : "Voce pode trocar a foto quando quiser."}
+                  </span>
+                </div>
               </div>
             </div>
-          </div>
-          <div className="mt-6 grid gap-4 md:grid-cols-2">
-            <Input label="Nome" value={productForm.name} onChange={(value) => setProductForm((current) => ({ ...current, name: value }))} required />
-            <Input label="Categoria" value={productForm.category} onChange={(value) => setProductForm((current) => ({ ...current, category: value }))} required />
-            <Input label="Modelo" value={productForm.model} onChange={(value) => setProductForm((current) => ({ ...current, model: value }))} required />
-            <Input label="Fabricante" value={productForm.manufacturer} onChange={(value) => setProductForm((current) => ({ ...current, manufacturer: value }))} required />
-            <Input label="Custo" type="number" value={productForm.cost_price} onChange={(value) => setProductForm((current) => ({ ...current, cost_price: value }))} required />
-            <Input label="Margem (%)" type="number" value={productForm.margin_percent} onChange={(value) => setProductForm((current) => ({ ...current, margin_percent: value }))} required />
-            <Input label="Venda" type="number" value={productForm.sale_price} onChange={(value) => setProductForm((current) => ({ ...current, sale_price: value }))} required />
-            <Input label="Estoque" type="number" value={productForm.stock} onChange={(value) => setProductForm((current) => ({ ...current, stock: value }))} required />
-            <Input label="URL da imagem" value={productForm.image} onChange={(value) => setProductForm((current) => ({ ...current, image: value || defaultProductImage }))} />
-            <Input label="Frase de impacto" value={productForm.hero_phrase} onChange={(value) => setProductForm((current) => ({ ...current, hero_phrase: value }))} required />
-          </div>
-          <div className="mt-4">
-            <label className="cliptor-label">Descricao</label>
-            <textarea className="cliptor-input min-h-32 w-full" value={productForm.description} onChange={(e) => setProductForm((current) => ({ ...current, description: e.target.value }))} required />
-          </div>
-          <label className="mt-4 flex items-center gap-3 text-sm text-zinc-300">
-            <input type="checkbox" checked={productForm.featured} onChange={(e) => setProductForm((current) => ({ ...current, featured: e.target.checked }))} />
-            Produto em destaque
-          </label>
-          <button className="cliptor-button mt-6">{editingProductId ? "Atualizar produto" : "Salvar produto"}</button>
-        </form>
+            <div className="mt-6 grid gap-4 md:grid-cols-2">
+              <Input label="Nome" value={productForm.name} onChange={(value) => setProductForm((current) => ({ ...current, name: value }))} required />
+              <Input label="Categoria" value={productForm.category} onChange={(value) => setProductForm((current) => ({ ...current, category: value }))} required />
+              <Input label="Modelo" value={productForm.model} onChange={(value) => setProductForm((current) => ({ ...current, model: value }))} required />
+              <Input label="Fabricante" value={productForm.manufacturer} onChange={(value) => setProductForm((current) => ({ ...current, manufacturer: value }))} required />
+              <Input label="Custo" type="number" value={productForm.cost_price} onChange={(value) => setProductForm((current) => ({ ...current, cost_price: value }))} required />
+              <Input label="Margem (%)" type="number" value={productForm.margin_percent} onChange={(value) => setProductForm((current) => ({ ...current, margin_percent: value }))} required />
+              <Input label="Venda" type="number" value={productForm.sale_price} onChange={(value) => setProductForm((current) => ({ ...current, sale_price: value }))} required />
+              <Input label="Estoque" type="number" value={productForm.stock} onChange={(value) => setProductForm((current) => ({ ...current, stock: value }))} required />
+              <Input label="URL da imagem" value={productForm.image} onChange={(value) => setProductForm((current) => ({ ...current, image: value || defaultProductImage }))} />
+              <Input label="Frase de impacto" value={productForm.hero_phrase} onChange={(value) => setProductForm((current) => ({ ...current, hero_phrase: value }))} required />
+            </div>
+            <div className="mt-4">
+              <label className="cliptor-label">Descricao</label>
+              <textarea className="cliptor-input min-h-32 w-full" value={productForm.description} onChange={(e) => setProductForm((current) => ({ ...current, description: e.target.value }))} required />
+            </div>
+            <label className="mt-4 flex items-center gap-3 text-sm text-zinc-300">
+              <input type="checkbox" checked={productForm.featured} onChange={(e) => setProductForm((current) => ({ ...current, featured: e.target.checked }))} />
+              Produto em destaque
+            </label>
+            <button className="cliptor-button mt-6">{editingProductId ? "Atualizar produto" : "Salvar produto"}</button>
+          </form>
 
-        <form onSubmit={saveContent} className="cliptor-card p-6">
+          <div className="cliptor-card p-6">
+            <h2 className="text-3xl font-black uppercase">Produtos ativos</h2>
+            <div className="mt-6 space-y-3">
+              {products.map((product) => (
+                <div key={product.id} className="flex items-center justify-between gap-4 rounded-[20px] border border-white/10 bg-black/25 p-4">
+                  <div>
+                    <p className="font-black uppercase">{product.name}</p>
+                    <p className="text-sm text-zinc-400">{product.category} | Estoque {product.stock}</p>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <p className="font-bold text-[#f8c35f]">{currency(product.sale_price)}</p>
+                    <button type="button" className="rounded-full border border-white/10 px-3 py-2 text-xs font-bold uppercase tracking-[0.18em] text-zinc-300 hover:border-[#f4b63e]/40" onClick={() => startEditProduct(product)}>
+                      Editar
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {activeAdminSection === "content" && (
+        <form onSubmit={saveContent} className="mt-10 cliptor-card p-6">
           <h2 className="text-3xl font-black uppercase">Conteudo do site</h2>
           <div className="mt-6 space-y-4">
             <div>
@@ -1487,55 +1528,22 @@ function AdminPage({ products, store, refreshData, addLocalProduct, updateLocalS
               </div>
             </div>
             <div className="grid gap-4 md:grid-cols-2">
-              <Input
-                label="Valor do seguro"
-                type="number"
-                value={content.insurance_fee}
-                onChange={(value) => setContent((current) => ({ ...current, insurance_fee: value }))}
-              />
-              <Input
-                label="Texto do seguro"
-                value={content.insurance_label}
-                onChange={(value) => setContent((current) => ({ ...current, insurance_label: value }))}
-              />
+              <Input label="Valor do seguro" type="number" value={content.insurance_fee} onChange={(value) => setContent((current) => ({ ...current, insurance_fee: value }))} />
+              <Input label="Texto do seguro" value={content.insurance_label} onChange={(value) => setContent((current) => ({ ...current, insurance_label: value }))} />
             </div>
             <label className="mt-2 flex items-center gap-3 text-sm text-zinc-300">
-              <input
-                type="checkbox"
-                checked={content.insurance_enabled}
-                onChange={(e) => setContent((current) => ({ ...current, insurance_enabled: e.target.checked }))}
-              />
+              <input type="checkbox" checked={content.insurance_enabled} onChange={(e) => setContent((current) => ({ ...current, insurance_enabled: e.target.checked }))} />
               Ativar seguro no checkout
             </label>
           </div>
           <button className="cliptor-button mt-6">Atualizar conteudo</button>
         </form>
-      </div>
+      )}
 
-      <div className="mt-10 grid gap-8 xl:grid-cols-[0.95fr_1.05fr]">
-        <div className="cliptor-card p-6">
-          <h2 className="text-3xl font-black uppercase">Produtos ativos</h2>
-          <div className="mt-6 space-y-3">
-            {products.map((product) => (
-              <div key={product.id} className="flex items-center justify-between gap-4 rounded-[20px] border border-white/10 bg-black/25 p-4">
-                <div>
-                  <p className="font-black uppercase">{product.name}</p>
-                  <p className="text-sm text-zinc-400">{product.category} | Estoque {product.stock}</p>
-                </div>
-                <div className="flex items-center gap-3">
-                  <p className="font-bold text-[#f8c35f]">{currency(product.sale_price)}</p>
-                  <button type="button" className="rounded-full border border-white/10 px-3 py-2 text-xs font-bold uppercase tracking-[0.18em] text-zinc-300 hover:border-[#f4b63e]/40" onClick={() => startEditProduct(product)}>
-                    Editar
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        <div ref={ordersSectionRef} className="cliptor-card p-6">
+      {activeAdminSection === "orders" && (
+        <div className="mt-10 cliptor-card p-6">
           <h2 className="text-3xl font-black uppercase">Pedidos</h2>
-          <p className="mt-2 text-sm text-zinc-400">Clique em um pedido para ver numero, cliente, endereco completo e status de pagamento.</p>
+          <p className="mt-2 text-sm text-zinc-400">Clique em um pedido para ver numero, cliente, itens vendidos, endereco completo e status de pagamento.</p>
           <div className="mt-6 grid gap-6 xl:grid-cols-[0.95fr_1.05fr]">
             <div className="space-y-3">
               {orders.length === 0 && <p className="text-zinc-400">Nenhum pedido ainda.</p>}
@@ -1587,6 +1595,20 @@ function AdminPage({ products, store, refreshData, addLocalProduct, updateLocalS
                     )}
                   </div>
                 </div>
+                <div className="mt-5 rounded-[18px] border border-white/10 bg-black/25 p-4">
+                  <p className="text-xs uppercase tracking-[0.18em] text-zinc-500">Produtos vendidos</p>
+                  <div className="mt-3 space-y-3">
+                    {(selectedOrder.items || []).map((item) => (
+                      <div key={`${selectedOrder.id}-${item.product_id}`} className="flex flex-wrap items-center justify-between gap-3 rounded-[14px] border border-white/10 bg-black/20 p-3">
+                        <div>
+                          <p className="font-bold uppercase text-white">{item.name}</p>
+                          <p className="text-xs uppercase tracking-[0.18em] text-zinc-500">Qtd {item.quantity}</p>
+                        </div>
+                        <p className="font-bold text-[#f8c35f]">{currency(item.total_price)}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
                 <div className="mt-5 grid gap-4 md:grid-cols-3">
                   <div className="rounded-[18px] border border-white/10 bg-black/25 p-4">
                     <p className="text-xs uppercase tracking-[0.18em] text-zinc-500">Status do pedido</p>
@@ -1612,7 +1634,7 @@ function AdminPage({ products, store, refreshData, addLocalProduct, updateLocalS
             )}
           </div>
         </div>
-      </div>
+      )}
     </section>
   );
 }
