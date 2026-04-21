@@ -1,0 +1,15 @@
+.git
+.gitignore
+frontend
+memory
+tests
+test_reports
+backend/.venv
+backend/__pycache__
+backend/uploads
+frontend/node_modules
+frontend/build
+**/__pycache__
+*.pyc
+.env
+backend/.env
